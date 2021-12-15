@@ -32,12 +32,12 @@ your `config/custom_components` folder.
 The integration will automatically detect any V6 STB devices on the network 
 if you have `zeroconf` configured in your HASS installation. 
 
-![Setup Discovered]()
+![Setup Discovered](images/setup_discovered.png)
 
 If you decide to add an STB device manually, you will be prompted for the IP 
 address and port number.
 
-![Setup Manual]()
+![Setup Manual](images/setup_manual.png)
 
 After this point the two setup routines are the same.
 
