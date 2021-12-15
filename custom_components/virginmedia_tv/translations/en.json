@@ -1,0 +1,95 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "TiVo already configured",
+      "incomplete_tivo": "Incomplete details for a TiVo device"
+    },
+    "flow_title": "{name}",
+    "step": {
+      "options": {
+        "title": "Options",
+        "description": "The following options require login details for Virgin Media",
+        "data": {
+          "channel_enable_fetch": "Retrieve your available channels",
+          "channel_use_media_browser": "Use media browser instead of source list for channel display"
+        }
+      },
+      "timeouts": {
+        "title": "Configure timeouts",
+        "data": {
+          "channel_interval": "How often to check for channel changes (in hours)",
+          "idle_timeout": "When to switch from the idle state to off (in hours, 0 = straight to off)",
+          "scan_interval": "Scan interval (in seconds)"
+        }
+      },
+      "tivo": {
+        "title": "Configure TiVo details",
+        "data": {
+          "host": "TiVo address",
+          "port": "Port number for network remote control"
+        }
+      },
+      "virgin_creds": {
+        "title": "Enter your Virgin Media details",
+        "description": "These are used for determining the available channels",
+        "data": {
+          "channel_user": "Username",
+          "channel_password": "Password"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "cache_confirm": {
+        "title": "Cleanup Confirmation",
+        "description": "The cache is shared by all instances. The following are still configured.\n\n{configured_instances}",
+        "data": {
+          "cache_confirm": "Are you sure you'd like to clear the selected caches?"
+        }
+      },
+      "cache_manage": {
+        "title": "Cleanup Options",
+        "data": {
+          "cache_clear": "Clear the channel and show information from the cache",
+          "creds_clear": "Clear the credentials from the cache"
+        }
+      },
+      "device_platform": {
+        "title": "Device Platform",
+        "description": "Select the TV platform used by Virgin Media"
+      },
+      "options": {
+        "title": "Options",
+        "description": "The following options require login details for Virgin Media",
+        "data": {
+          "channel_enable_fetch": "Retrieve your available channels",
+          "channel_use_media_browser": "Use media browser instead of source list for channel display"
+        }
+      },
+      "timeouts": {
+        "title": "Configure timeouts",
+        "data": {
+          "channel_interval": "How often to check for channel changes (in hours)",
+          "idle_timeout": "When to switch from the idle state to off (in hours, 0 = straight to off)",
+          "scan_interval": "Scan interval (in seconds)"
+        }
+      },
+      "v6_region": {
+        "title": "Select the region",
+        "description": "This is necessary to ensure regional stations are correct",
+        "data": {
+          "channel_region": "Choose the region that best suits where you are"
+        }
+      },
+      "virgin_creds": {
+        "title": "Enter your Virgin Media details",
+        "description": "These are used for determining the available channels",
+        "data": {
+          "channel_user": "Username",
+          "channel_password": "Password"
+        }
+      }
+    }
+  }
+}

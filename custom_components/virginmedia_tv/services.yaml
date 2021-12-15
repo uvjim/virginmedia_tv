@@ -1,0 +1,34 @@
+send_ircode:
+  name: Send IR Code
+  description: Send the given IR code to the media player
+  target:
+    entity:
+      domain: media_player
+      integration: virginmedia_tv
+  fields:
+    code:
+      name: IR Code
+      description: The IR code to send to the device
+      required: true
+      example: "pause"
+      selector:
+        select:
+          options:
+            !include codes/common_codes.yaml
+send_keycode:
+  name: Send Key Code
+  description: Send the given key code to the media player
+  target:
+    entity:
+      domain: media_player
+      integration: virginmedia_tv
+  fields:
+    code:
+      name: Key Code
+      description: The key code to send to the device
+      required: true
+      example: "num0"
+      selector:
+        select:
+          options:
+            !include_dir_merge_list codes
