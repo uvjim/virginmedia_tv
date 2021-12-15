@@ -41,7 +41,7 @@ address and port number.
 
 After this point the two setup routines are the same.
 
-![Setup Options]()
+![Setup Options](images/setup_options.png)
 
 - `Retrieve your available channels` - when selected the channels available 
   to you will be retrieved from the Virgin Media online TV listings.
@@ -54,12 +54,12 @@ After this point the two setup routines are the same.
   displaying 
   TV channels. If not selected the list of sources will be used.
 
-![Setup Creds]()
+![Setup Creds](images/setup_creds.png)
 
 If you previously selected to retrieve channels then you will need to enter 
 your Virgin Media credentials.
 
-![Setup Timeouts]()
+![Setup Timeouts](images/setup_timeouts.png)
 
 - `Scan interval (in seconds)` - how often to check for changes on the STB.
 - `When to switch from the idle state to off (in hours, 0 = straight to off)` -
@@ -69,7 +69,7 @@ your Virgin Media credentials.
 - `How often to check for channel changes (in hours)` - after the given 
   period the channel list will be refreshed.
 
-![Setup Finish]()
+![Setup Finish](images/setup_finish.png)
 
 Clicking `Finish` will complete the integration setup.
 
@@ -97,7 +97,7 @@ available codes is provided.
 All the options can be reconfigured once the integration has been created. 
 There are some additional steps in this flow though.
 
-![Configure Platform]()
+![Configure Platform](images/configure_platform.png)
 
 The options here allow you to switch between the available STB platforms. 
 
@@ -105,13 +105,13 @@ The options here allow you to switch between the available STB platforms.
 > currently supported. At present this option only affects the processing of 
 > the channel listing.
 
-![Configure Options]()
+![Configure Options](images/configure_options.png)
 
 If you had previously configured to retrieve channel listings but later 
 decide that you do not want to do this anymore, deselecting the option 
 results in the following: -
 
-![Configure Cache]()
+![Configure Cache](images/configure_cache.png)
 
 - `Clear the credentials from the cache` - selecting this option will remove 
   the credentails from the configured integration and will also remove any 
@@ -119,7 +119,7 @@ results in the following: -
 - `Clear the channel and show information from the cache` - selecting this 
   option will remove the channel listing and any cached guide information.
 
-![Configure Cache Confirmation]()
+![Configure Cache Confirmation](images/configure_cache_confirm.png)
 
 If you have multiple STB devices configured these will be listed, and you'll 
 need to confirm that you'd like to clean the cache. The cache is shared 
@@ -127,27 +127,27 @@ across the configured STB devices so clearing when configuring one of them
 may cause the other integration to re-authenticate and re-cache the 
 necessary information.
 
-![Configure Timeouts]()
+![Configure Timeouts](images/configure_timeouts.png)
 
 The timeouts screen will only show those timeouts that are relevant to your 
 selections - notice in this case the timeout for channel retrieval is no 
 longer presented.
 
-### Re-enabling or re-configuring channel retrieval
+### Re-enabling or re-configuring channel retrieval/region
 
-![Configure Options Re-enable]()
+![Configure Options Re-enable](images/configure_options_re-enable.png)
 
 If you had previously disabled channel retrieval or are looking to change 
 the channel region then ensure the channel retrieval is selected in the 
 options screen.
 
-![Configure Creds]()
+![Configure Creds](images/configure_creds.png)
 
 You will be prompted to re-enter your credentials (depending on whether 
 these were removed from the cache or never there in the first place) they 
 may already be pre-filled.
 
-![Configure Region]()
+![Configure Region](images/configure_region.png)
 
 You will be prompted for the region that best suits your location. These 
 regions are as per TV Channel Lists.
@@ -169,5 +169,6 @@ the fact that Logitech have decided to discontinue their remote controls, so
 I decided to investigate other options): -
 
 https://github.com/bertbert72/HomeAssistant_VirginTivo
+
 https://github.com/Sholofly/ziggonext-python
 
