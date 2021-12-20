@@ -594,7 +594,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         _LOGGER.debug(self._logger_message_format("exited"))
 
-    async def _async_cache_channels(self) -> None:
+    async def _async_cache_channels(self, _: Optional[dt_util.dt.datetime] = None) -> None:
         """Fetch the channels from the online service and cache locally
 
         :return: None
