@@ -1114,6 +1114,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         """Device class of the entity"""
 
         # TODO: Remove DEVICE_CLASS_TV if setting the minimum HASS version to 2021.12
+        # noinspection PyUnresolvedReferences
         return DEVICE_CLASS_TV or MediaPlayerDeviceClass.TV
 
     @property
@@ -1181,7 +1182,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
     def media_image_remotely_accessible(self) -> bool:
         """Is the image accessible remotely"""
 
-        if self._channel_current.get("details"):
+        if self._channel_logo(channel_number=self._channel_current["number"]):
             return True
         else:
             return False
