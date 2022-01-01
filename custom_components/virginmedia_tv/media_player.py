@@ -810,7 +810,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
                         # region #-- set the current program --#
                         self._current_program_set()
-                        self._current_program_get_position()
                         # endregion
                     # endregion
 
