@@ -185,6 +185,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         self._channels_available: List[Dict[str, Any]] = []
         self._client: Client
         self._config: ConfigEntry = config_entry
+        self._extra_state_attributes: Dict[str, Any] = {}
         self._flags: Dict[str, bool] = {}
         self._hass: HomeAssistant = hass
         self._intervals: Dict[str, Callable] = {}
@@ -469,6 +470,11 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         else:
             self._channel_current["program"] = None
 
+        _LOGGER.debug(
+            self._logger_message_format("current program is set: %s"),
+            self._channel_current["program"] is not None
+        )
+
         self._current_program_get_position()
         asyncio.run_coroutine_threadsafe(coro=self.async_update_ha_state(), loop=self.hass.loop)
         _LOGGER.debug(self._logger_message_format("exited"))
@@ -711,6 +717,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                 return
 
         if not self._client.device.channel_number:
+            if self._channel_current["number"]:
+                self._extra_state_attributes["channel_prior"] = self._channel_current["number"]
             self._channel_current["number"] = None
             self._current_channel_reset()
             self._current_program_get_position()
@@ -1128,6 +1136,17 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             "name": self.name,
             "sw_version": self._config.data.get(CONF_SWVERSION, ""),
         })
+        return ret
+
+    @property
+    def extra_state_attributes(self) -> Optional[Dict[str, Any]]:
+        """"""
+
+        if self._state in (STATE_OFF, STATE_IDLE):
+            ret = self._extra_state_attributes
+        else:
+            ret = None
+
         return ret
 
     @property
