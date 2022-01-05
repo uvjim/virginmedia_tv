@@ -747,7 +747,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         if not self._client.device.channel_number:
             if self._channel_current["number"]:
-                self._extra_state_attributes["channel_prior"] = self._channel_current["number"]
+                self._extra_state_attributes["channel_at_idle_off"] = self._channel_current["number"]
             self._channel_current["number"] = None
             self._current_channel_reset()
             self._current_program_get_position()
