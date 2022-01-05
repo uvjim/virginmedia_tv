@@ -681,7 +681,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             password=self._config.options.get(CONF_CHANNEL_PWD, ""),
             existing_session=cached_session,
         ) as listings_api:
-            if isinstance(station_id, dt_util.dt.datetime):
+            if isinstance(station_id, dt_util.dt.datetime) or station_id is None:
                 _LOGGER.debug(
                     self._logger_message_format("using stored station id: %s"),
                     self._channel_current["station_id"]
@@ -832,22 +832,24 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                             ),
                             station_id=station_id
                         ):
-                            await self._async_cache_listings()  # station_id=station_id)
+                            await self._async_cache_listings()
                         else:
                             cache_listings = self._cache_load(cache_type="listings", station_id=station_id)
                             self._channel_current["listings"] = cache_listings.get("listings", [])
 
                         # set the listings to update
-                        self._ils_cancel(cancel_type="listener", name="listings_update")
-                        prog_last = self._channel_current["listings"][-1]
-                        prog_last = prog_last.get("endTime", (_get_current_epoch() * 1000))
-                        cache_again_at = dt_util.dt.datetime.fromtimestamp((prog_last / 1000) - 60)
-                        self._ils_create(
-                            create_type="listener",
-                            name="listings_update",
-                            func=self._async_cache_listings,
-                            when=cache_again_at,
-                        )
+                        if "listings_update" in self._listeners:
+                            self._ils_cancel(cancel_type="listener", name="listings_update")
+                        if self._channel_current.get("listings"):
+                            prog_last = self._channel_current["listings"][-1]
+                            prog_last = prog_last.get("endTime", (_get_current_epoch() * 1000))
+                            cache_again_at = dt_util.dt.datetime.fromtimestamp((prog_last / 1000) - 60)
+                            self._ils_create(
+                                create_type="listener",
+                                name="listings_update",
+                                func=self._async_cache_listings,
+                                when=cache_again_at,
+                            )
                         # endregion
 
                         # region #-- set the current program --#
