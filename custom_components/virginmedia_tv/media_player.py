@@ -65,8 +65,6 @@ from homeassistant.helpers.entity_platform import (
 from homeassistant.helpers.event import async_track_time_interval, async_track_point_in_time
 from homeassistant.util import dt as dt_util
 
-from .logger import VirginTvLogger
-
 from .const import (
     CONF_CHANNEL_FETCH_ENABLE,
     CONF_CHANNEL_INTERVAL,
@@ -97,15 +95,22 @@ from .const import (
     DOMAIN,
     SIGNAL_CLEAR_CACHE,
 )
+
+from .flagging import VirginTvFlagFile
+
+from .logger import VirginTvLogger
+
+from .pyvmtvguide.api import (
+    API,
+    TVChannelLists,
+)
+
 from .pyvmtivo.client import Client
+
 from .pyvmtivo.exceptions import (
     VirginMediaCommandTimeout,
     VirginMediaError,
     VirginMediaInvalidChannel,
-)
-from .pyvmtvguide.api import (
-    API,
-    TVChannelLists,
 )
 # endregion
 
@@ -187,6 +192,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         self._config: ConfigEntry = config_entry
         self._extra_state_attributes: Dict[str, Any] = {}
         self._flags: Dict[str, bool] = {}
+        self._global_flag_channel_cache = VirginTvFlagFile(path=hass.config.path(DOMAIN, ".channels_caching"))
         self._hass: HomeAssistant = hass
         self._intervals: Dict[str, Callable] = {}
         self._listeners: Dict[str, Callable] = {}
@@ -608,6 +614,11 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         _LOGGER.debug(self._logger_message_format("entered"))
 
+        if self._global_flag_channel_cache.is_flagged():
+            _LOGGER.debug(self._logger_message_format("exiting, already running"))
+            return
+
+        self._global_flag_channel_cache.create()
         cached_session = self._cache_load(cache_type="auth")
         try:
             async with API(
@@ -644,6 +655,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         self._cache_process_available_channels(channel_cache=channels)
 
+        self._global_flag_channel_cache.delete()
         _LOGGER.debug(self._logger_message_format("exited"))
 
     async def _async_cache_listings(self, station_id: str) -> None:
