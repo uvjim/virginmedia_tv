@@ -54,7 +54,10 @@ from homeassistant.const import (
     STATE_PAUSED,
     STATE_PLAYING,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import (
@@ -126,12 +129,53 @@ _FLAG_TURNING_ON: str = "turning_on"
 _FLAG_TURNING_OFF: str = "turning_off"
 _LOGGER = logging.getLogger(__name__)
 _MEDIA_POSITION_UPDATE_INTERVAL: float = 60
+_SERVICE_DEFINITIONS = [
+    {
+        "func": "_async_send_ircode",
+        "name": "send_ircode",
+        "schema": {
+            vol.Required("code"): cv.string
+        }
+    },
+    {
+        "func": "_async_send_keycode",
+        "name": "send_keycode",
+        "schema": {
+            vol.Required("code"): cv.string
+        }
+    },
+]
 
 
 def _get_current_epoch() -> int:
     """Get the current epoch time"""
 
     return int(dt_util.now().timestamp())
+
+
+async def _async_service_wrapper(entity: "VirginMediaPlayer", service_call: ServiceCall) -> None:
+    """Provide greater control over the call to service functions.
+
+    N.B. adds a parameter that denotes this call came from the service
+
+    :param entity: entity instance
+    :param service_call: details of the service call
+    :return: None
+    """
+
+    # retrieve the details about the called service
+    service_details = [
+        service_details
+        for service_details in _SERVICE_DEFINITIONS
+        if service_details.get("name").lower() == service_call.service.lower()
+    ]
+
+    if service_details:
+        service_details = service_details[0]
+        if "func" in service_details:  # make sure there's a function defined
+            if hasattr(entity, service_details.get("func")):  # check the function exists
+                func_action = getattr(entity, service_details.get("func"))
+                await func_action(**service_call.data, from_service=True)
 
 
 async def async_setup_entry(
@@ -150,29 +194,12 @@ async def async_setup_entry(
     # endregion
 
     # region #-- create the entity services --#
-    service_definitions = [
-        {
-            "func": "_async_send_ircode",
-            "name": "send_ircode",
-            "schema": {
-                vol.Required("code"): cv.string
-            }
-        },
-        {
-            "func": "_async_send_keycode",
-            "name": "send_keycode",
-            "schema": {
-                vol.Required("code"): cv.string
-            }
-        },
-    ]
-
     platform: EntityPlatform = async_get_current_platform()
-    for service_details in service_definitions:
+    for service_details in _SERVICE_DEFINITIONS:
         platform.async_register_entity_service(
             name=service_details.get("name", ""),
             schema=service_details.get("schema", None),
-            func=service_details.get("func", "")
+            func=_async_service_wrapper
         )
     # endregion
 
@@ -195,6 +222,11 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         self._global_flag_channel_cache = VirginTvFlagFile(path=hass.config.path(DOMAIN, ".channels_caching"))
         self._hass: HomeAssistant = hass
         self._intervals: Dict[str, Callable] = {}
+        self._key_to_action: Dict[str, Callable] = {
+            "pause": self.async_media_pause,
+            "play": self.async_media_play,
+            "stop": self.async_media_stop,
+        }
         self._listeners: Dict[str, Callable] = {}
         self._lock_client: asyncio.Lock = asyncio.Lock()
         self._lock_removing: asyncio.Lock = asyncio.Lock()
@@ -785,11 +817,12 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                             )
                     # endregion
         else:
-            if self._state != STATE_PAUSED:
-                self._state = STATE_PLAYING
+            # if self._state != STATE_PAUSED:
+            #     self._state = STATE_PLAYING
             if "idle_to_off" in self._listeners:
                 self._ils_cancel(name="idle_to_off", cancel_type="listener")
             if self._channel_current["number"] != self._client.device.channel_number:
+                self._state = STATE_PLAYING
                 _LOGGER.debug(
                     self._logger_message_format("channel changed from %s to %s"),
                     self._channel_current["number"],
@@ -859,39 +892,53 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         await self.async_update_ha_state()
 
-    async def _async_send_ircode(self, code: str) -> None:
+    async def _async_send_ircode(self, code: str, from_service: bool = False, **_) -> None:
         """Sends an ircode to the device"""
 
         _LOGGER.debug(self._logger_message_format("entered, code: %s"), code)
-        async with self._lock_client:
-            async with self._client:
-                try:
-                    await self._client.send_ircode(code=code)
-                except Exception as err:
-                    _LOGGER.debug(
-                        self._logger_message_format("type: %s, message: %s", include_lineno=True),
-                        type(err),
-                        err
-                    )
-                    if not isinstance(err, VirginMediaCommandTimeout) and not self._flags.get(_FLAG_TURNING_ON):
-                        raise err from None
+
+        if from_service and code.lower() in self._key_to_action:
+            func_action = self._key_to_action.get(code.lower(), None)
+            if func_action is not None:
+                _LOGGER.debug(self._logger_message_format("received action key, deferring to action method"))
+                await func_action()
+        else:
+            async with self._lock_client:
+                async with self._client:
+                    try:
+                        await self._client.send_ircode(code=code)
+                    except Exception as err:
+                        _LOGGER.debug(
+                            self._logger_message_format("type: %s, message: %s", include_lineno=True),
+                            type(err),
+                            err
+                        )
+                        if not isinstance(err, VirginMediaCommandTimeout) and not self._flags.get(_FLAG_TURNING_ON):
+                            raise err from None
         _LOGGER.debug(self._logger_message_format("exited"))
 
-    async def _async_send_keycode(self, code: str) -> None:
+    async def _async_send_keycode(self, code: str, from_service: bool = False, **_) -> None:
         """Sends a keycode to the device"""
 
         _LOGGER.debug(self._logger_message_format("entered, code: %s"), code)
-        async with self._lock_client:
-            async with self._client:
-                try:
-                    await self._client.send_keyboard(code=code)
-                except Exception as err:
-                    _LOGGER.warning(
-                        self._logger_message_format("type: %s, message: %s", include_lineno=True),
-                        type(err),
-                        err
-                    )
-                    raise err from None
+
+        if from_service and code.lower() in self._key_to_action:
+            func_action = self._key_to_action.get(code.lower(), None)
+            if func_action is not None:
+                _LOGGER.debug(self._logger_message_format("received action key, deferring to action method"))
+                await func_action()
+        else:
+            async with self._lock_client:
+                async with self._client:
+                    try:
+                        await self._client.send_keyboard(code=code)
+                    except Exception as err:
+                        _LOGGER.warning(
+                            self._logger_message_format("type: %s, message: %s", include_lineno=True),
+                            type(err),
+                            err
+                        )
+                        raise err from None
         _LOGGER.debug(self._logger_message_format("exited"))
     # endregion
 
@@ -1047,7 +1094,10 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         except Exception:
             raise
         else:
-            self._state = STATE_PAUSED
+            if self._state == STATE_PLAYING:
+                self._state = STATE_PAUSED
+            elif self._state == STATE_PAUSED:
+                self._state = STATE_PLAYING
             await self.async_update_ha_state()
         _LOGGER.debug(self._logger_message_format("exited"))
 
@@ -1061,7 +1111,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         except Exception:
             raise
         else:
-            self._state = STATE_PLAYING
+            if self._state not in (STATE_OFF, STATE_IDLE):
+                self._state = STATE_PLAYING
             await self.async_update_ha_state()
         _LOGGER.debug(self._logger_message_format("exited"))
 
@@ -1074,6 +1125,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         except Exception:
             raise
         else:
+            if self._state == STATE_PAUSED:
+                self._state = STATE_PLAYING
             await self.async_update_ha_state()
         _LOGGER.debug(self._logger_message_format("exited"))
 
