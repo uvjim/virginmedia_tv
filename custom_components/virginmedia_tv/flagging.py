@@ -8,7 +8,7 @@ from typing import Optional
 from .logger import VirginTvLogger
 # endregion
 
-_LOGGER = logging.getLogger()
+_LOGGER = logging.getLogger(__name__)
 
 
 class VirginTvFlagFile(VirginTvLogger):
@@ -44,7 +44,7 @@ class VirginTvFlagFile(VirginTvLogger):
 
         _LOGGER.debug(self._logger_message_format("entered"))
 
-        if self._flag_path:
+        if not self._flag_path:
             _LOGGER.debug(self._logger_message_format("_flag_path not defined"))
             return
 
