@@ -173,17 +173,18 @@ class Client:
 
         _LOGGER.debug("disconnect --> exited")
 
-    async def send_ircode(self, code: str) -> None:
+    async def send_ircode(self, code: str, wait_for_reply: bool = True) -> None:
         """Send an infrared code to the device
 
         :param code: the IR code to send
+        :param wait_for_reply: True if intending to wait for a response
         :return: None
         """
 
         _LOGGER.debug("send_ircode --> entered")
         try:
             _LOGGER.debug("send_ircode --> sending ircode: %s", code)
-            await self._send(f"ircode {code}")
+            await self._send(f"ircode {code}", wait_for_reply=wait_for_reply)
         except VirginMediaError as err:
             if str(err).lower() == "invalid_key":
                 raise VirginMediaInvalidKey(key_code=code)
@@ -196,19 +197,20 @@ class Client:
 
         _LOGGER.debug("send_ircode --> exited")
 
-    async def send_keyboard(self, code: str) -> None:
+    async def send_keyboard(self, code: str, wait_for_reply: bool = True) -> None:
         """Send a keyboard code to the device
 
         :param code: the keyboard code to send
+        :param wait_for_reply: True to wait for a response after sending
         :return: None
         """
 
         _LOGGER.debug("send_keyboard --> entered")
         try:
             _LOGGER.debug("send_keyboard --> sending keyboard: %s", code)
-            await self._send(f"keyboard {code}")
+            await self._send(f"keyboard {code}", wait_for_reply=wait_for_reply)
         except VirginMediaError as err:
-            _LOGGER.warning("send_keyboard --> line 208 --> type: %s, message: %s", type(err), err)
+            _LOGGER.warning("send_keyboard --> type: %s, message: %s", type(err), err)
             if str(err).lower() == "invalid_key":
                 raise VirginMediaInvalidKey(key_code=code)
         else:
