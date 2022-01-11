@@ -892,21 +892,21 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         await self.async_update_ha_state()
 
-    async def _async_send_ircode(self, code: str, from_service: bool = False, **_) -> None:
+    async def _async_send_ircode(self, code: str, from_service: bool = False, **kwargs) -> None:
         """Sends an ircode to the device"""
 
-        _LOGGER.debug(self._logger_message_format("entered, code: %s"), code)
+        _LOGGER.debug(self._logger_message_format("entered, code: %s, from_service: %s"), code, from_service)
 
         if from_service and code.lower() in self._key_to_action:
             func_action = self._key_to_action.get(code.lower(), None)
             if func_action is not None:
                 _LOGGER.debug(self._logger_message_format("received action key, deferring to action method"))
-                await func_action()
+                await func_action(deferred=True)
         else:
             async with self._lock_client:
                 async with self._client:
                     try:
-                        await self._client.send_ircode(code=code)
+                        await self._client.send_ircode(code=code, wait_for_reply=not kwargs.get("deferred", False))
                     except Exception as err:
                         _LOGGER.debug(
                             self._logger_message_format("type: %s, message: %s", include_lineno=True),
@@ -917,21 +917,21 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                             raise err from None
         _LOGGER.debug(self._logger_message_format("exited"))
 
-    async def _async_send_keycode(self, code: str, from_service: bool = False, **_) -> None:
+    async def _async_send_keycode(self, code: str, from_service: bool = False, **kwargs) -> None:
         """Sends a keycode to the device"""
 
-        _LOGGER.debug(self._logger_message_format("entered, code: %s"), code)
+        _LOGGER.debug(self._logger_message_format("entered, code: %s, from_service: %s"), code, from_service)
 
         if from_service and code.lower() in self._key_to_action:
             func_action = self._key_to_action.get(code.lower(), None)
             if func_action is not None:
                 _LOGGER.debug(self._logger_message_format("received action key, deferring to action method"))
-                await func_action()
+                await func_action(deferred=True)
         else:
             async with self._lock_client:
                 async with self._client:
                     try:
-                        await self._client.send_keyboard(code=code)
+                        await self._client.send_keyboard(code=code, wait_for_reply=not kwargs.get("deferred", False))
                     except Exception as err:
                         _LOGGER.warning(
                             self._logger_message_format("type: %s, message: %s", include_lineno=True),
@@ -1085,12 +1085,12 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             title="Channels",
         )
 
-    async def async_media_pause(self) -> None:
+    async def async_media_pause(self, **kwargs) -> None:
         """Pause the currently playing media"""
 
-        _LOGGER.debug(self._logger_message_format("entered"))
+        _LOGGER.debug(self._logger_message_format("entered, deferred: %s"), kwargs.get("deferred", False))
         try:
-            await self._async_send_keycode(code="pause")
+            await self._async_send_keycode(code="pause", deferred=kwargs.get("deferred", False))
         except Exception:
             raise
         else:
@@ -1101,13 +1101,12 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             await self.async_update_ha_state()
         _LOGGER.debug(self._logger_message_format("exited"))
 
-    async def async_media_play(self) -> None:
+    async def async_media_play(self, **kwargs) -> None:
         """Play the media"""
 
-        _LOGGER.debug(self._logger_message_format("entered"))
-
+        _LOGGER.debug(self._logger_message_format("entered, deferred: %s"), kwargs.get("deferred", False))
         try:
-            await self._async_send_keycode(code="play")
+            await self._async_send_keycode(code="play", deferred=kwargs.get("deferred", False))
         except Exception:
             raise
         else:
@@ -1116,12 +1115,12 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             await self.async_update_ha_state()
         _LOGGER.debug(self._logger_message_format("exited"))
 
-    async def async_media_stop(self) -> None:
+    async def async_media_stop(self, **kwargs) -> None:
         """Stop the media"""
 
-        _LOGGER.debug(self._logger_message_format("entered"))
+        _LOGGER.debug(self._logger_message_format("entered, deferred: %s"), kwargs.get("deferred", False))
         try:
-            await self._async_send_keycode(code="stop")
+            await self._async_send_keycode(code="stop", deferred=kwargs.get("deferred", False))
         except Exception:
             raise
         else:
