@@ -691,21 +691,17 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         self._global_flag_channel_cache.delete()
         _LOGGER.debug(self._logger_message_format("exited"))
 
-    async def _async_cache_listings(
-        self,
-        station_id: Optional[Union[str, dt_util.dt.datetime]] = None
-    ) -> None:
+    async def _async_cache_listings(self) -> None:
         """Fetch the channel listings from the online service and cache locally
 
-        N.B. if this function is called on an interval the station_id will be
-        of type datetime. In this case we'll need to use the current station_id
-        from the listings.
-
-        :param station_id: the station ID to fetch the listings for
         :return: None
         """
 
-        _LOGGER.debug(self._logger_message_format("entered, station_id: %s"), station_id)
+        _LOGGER.debug(self._logger_message_format("entered"))
+
+        if not self._channel_current["station_id"]:
+            _LOGGER.debug(self._logger_message_format("exited, no station_id set"))
+            return
 
         cached_session = self._cache_load(cache_type="auth")
         async with API(
@@ -713,27 +709,23 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             password=self._config.options.get(CONF_CHANNEL_PWD, ""),
             existing_session=cached_session,
         ) as listings_api:
-            if isinstance(station_id, dt_util.dt.datetime) or station_id is None:
-                _LOGGER.debug(
-                    self._logger_message_format("using stored station id: %s"),
-                    self._channel_current["station_id"]
-                )
-                station_id = self._channel_current["station_id"]
+            _LOGGER.debug(
+                self._logger_message_format("using stored station id: %s"),
+                self._channel_current["station_id"]
+            )
 
-            if station_id:
-                listings = await listings_api.async_get_listing(
-                    channel_id=station_id,
-                    start_time=_get_current_epoch(),
-                    duration_hours=self._config.options.get(CONF_CHANNEL_LISTINGS_CACHE, DEF_CHANNEL_LISTINGS_CACHE)
-                )
+            listings = await listings_api.async_get_listing(
+                channel_id=self._channel_current["station_id"],
+                start_time=_get_current_epoch(),
+                duration_hours=self._config.options.get(CONF_CHANNEL_LISTINGS_CACHE, DEF_CHANNEL_LISTINGS_CACHE)
+            )
 
         # region #-- cache the details --#
-        if station_id:
-            listings_path = self._cache_get_path(cache_type="listings", station_id=station_id)
-            os.makedirs(os.path.dirname(listings_path), exist_ok=True)
-            with open(listings_path, "w") as cache_file:
-                json.dump(listings, cache_file, indent=2)
-            self._channel_current["listings"] = listings.get("listings", [])  # load the cache into the instance
+        listings_path = self._cache_get_path(cache_type="listings", station_id=self._channel_current["station_id"])
+        os.makedirs(os.path.dirname(listings_path), exist_ok=True)
+        with open(listings_path, "w") as cache_file:
+            json.dump(listings, cache_file, indent=2)
+        self._channel_current["listings"] = listings.get("listings", [])  # load the cache into the instance
         # endregion
 
         _LOGGER.debug(self._logger_message_format("exited"))
@@ -817,8 +809,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                             )
                     # endregion
         else:
-            # if self._state != STATE_PAUSED:
-            #     self._state = STATE_PLAYING
             if "idle_to_off" in self._listeners:
                 self._ils_cancel(name="idle_to_off", cancel_type="listener")
             if self._channel_current["number"] != self._client.device.channel_number:
@@ -874,13 +864,20 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                         if "listings_update" in self._listeners:
                             self._ils_cancel(cancel_type="listener", name="listings_update")
                         if self._channel_current.get("listings"):
+
+                            async def _async_listener_updates(_: dt_util.dt.datetime) -> None:
+                                """Wrapper to re-cache the listings and set the current program"""
+
+                                await self._async_cache_listings()
+                                self._current_program_set()
+
                             prog_last = self._channel_current["listings"][-1]
                             prog_last = prog_last.get("endTime", (_get_current_epoch() * 1000))
                             cache_again_at = dt_util.dt.datetime.fromtimestamp((prog_last / 1000) - 60)
                             self._ils_create(
                                 create_type="listener",
                                 name="listings_update",
-                                func=self._async_cache_listings,
+                                func=_async_listener_updates,
                                 when=cache_again_at,
                             )
                         # endregion
