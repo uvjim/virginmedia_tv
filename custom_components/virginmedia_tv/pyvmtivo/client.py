@@ -18,6 +18,7 @@ from .exceptions import (
     format_error_message,
     VirginMediaError,
     VirginMediaCommandTimeout,
+    VirginMediaConnectionReset,
     VirginMediaInvalidChannel,
     VirginMediaInvalidCommand,
     VirginMediaInvalidKey,
@@ -284,13 +285,9 @@ class Client:
                 _LOGGER.debug("wait_for_data --> raw data: %s", data)
 
                 if not data:
-                    try:
-                        raise ConnectionResetError
-                    except ConnectionResetError as err:
-                        _LOGGER.warning("wait_for_data --> line 285 --> connection reset")
-                        # noinspection PyProtectedMember
-                        self._tivo._set_channel_number()
-                        raise VirginMediaError(format_error_message(err)) from None
+                    # noinspection PyProtectedMember
+                    self._tivo._set_channel_number()
+                    raise VirginMediaConnectionReset from None
 
                 data = data.decode().strip()
                 if data.startswith("CH_STATUS"):

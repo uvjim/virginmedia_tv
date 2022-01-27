@@ -37,6 +37,15 @@ class VirginMediaCommandTimeout(VirginMediaError):
         super().__init__(f"Command timeout")
 
 
+class VirginMediaConnectionReset(VirginMediaError):
+    """"""
+
+    def __init__(self):
+        """"""
+
+        super().__init__(f"Connection reset")
+
+
 class VirginMediaInvalidChannel(VirginMediaError):
     """"""
 

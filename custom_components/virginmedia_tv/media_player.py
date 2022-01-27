@@ -112,6 +112,7 @@ from .pyvmtivo.client import Client
 
 from .pyvmtivo.exceptions import (
     VirginMediaCommandTimeout,
+    VirginMediaConnectionReset,
     VirginMediaError,
     VirginMediaInvalidChannel,
 )
@@ -748,7 +749,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                     try:
                         await self._client.wait_for_data()
                     except VirginMediaError as err:
-                        if not isinstance(err, VirginMediaCommandTimeout):
+                        if not isinstance(err, VirginMediaCommandTimeout) and \
+                                not isinstance(err, VirginMediaConnectionReset):
                             _LOGGER.warning(
                                 self._logger_message_format("type: %s, message: %s", include_lineno=True),
                                 type(err),
