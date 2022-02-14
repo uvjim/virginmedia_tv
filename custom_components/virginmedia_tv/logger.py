@@ -16,4 +16,5 @@ class VirginTvLogger:
 
         caller: inspect.FrameInfo = inspect.stack()[1]
         line_no = f" --> line: {caller.lineno}" if include_lineno else ""
-        return f"{self._logger_prefix}{caller.function} ({self.unique_id}){line_no} --> {msg}"
+        unique_id = f" ({self.unique_id})" if self.unique_id else ""
+        return f"{self._logger_prefix}{caller.function}{unique_id}{line_no} --> {msg}"
