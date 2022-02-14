@@ -32,3 +32,11 @@ send_keycode:
         select:
           options:
             !include_dir_merge_list codes
+update_channels:
+  name: Update Channels
+  description: Force update the channel cache. This is useful if there has been channel changes before configured re-cache time.
+               This will only update the selected entity. Other entities will update when they next change channel.
+  target:
+    entity:
+      domain: media_player
+      integration: virginmedia_tv
