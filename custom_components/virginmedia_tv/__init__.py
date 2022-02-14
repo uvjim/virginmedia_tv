@@ -4,6 +4,7 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -11,7 +12,7 @@ PLATFORMS = ["media_player", "sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
-    """Setup a device from a config entry"""
+    """Set up a device from a config entry"""
 
     _LOGGER.debug("Setting up config entry: %s", config_entry.unique_id)
 
@@ -39,3 +40,9 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
     """Reload the config entry"""
 
     return await hass.config_entries.async_reload(config_entry.entry_id)
+
+
+def get_current_epoch() -> int:
+    """Get the current epoch time"""
+
+    return int(dt_util.now().timestamp())

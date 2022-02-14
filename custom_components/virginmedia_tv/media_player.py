@@ -3,7 +3,6 @@
 # region #-- imports --#
 import asyncio
 import glob
-import json
 import logging
 import os
 from abc import ABC
@@ -68,6 +67,16 @@ from homeassistant.helpers.entity_platform import (
 from homeassistant.helpers.event import async_track_time_interval, async_track_point_in_time
 from homeassistant.util import dt as dt_util
 
+from . import get_current_epoch
+
+from .caching import (
+    VirginMediaCache,
+    VirginMediaCacheAuth,
+    VirginMediaCacheChannels,
+    VirginMediaCacheChannelMappings,
+    VirginMediaCacheListings,
+)
+
 from .const import (
     CONF_CHANNEL_FETCH_ENABLE,
     CONF_CHANNEL_INTERVAL,
@@ -84,12 +93,9 @@ from .const import (
     CONF_PORT,
     CONF_SCAN_INTERVAL,
     CONF_SWVERSION,
-    DEF_AUTH_FILE,
     DEF_CHANNEL_FETCH_ENABLE,
-    DEF_CHANNEL_FILE,
     DEF_CHANNEL_INTERVAL,
     DEF_CHANNEL_LISTINGS_CACHE,
-    DEF_CHANNEL_MAPPINGS_FILE,
     DEF_CHANNEL_REGION,
     DEF_CHANNEL_USE_MEDIA_BROWSER,
     DEF_DEVICE_PLATFORM,
@@ -102,11 +108,6 @@ from .const import (
 from .flagging import VirginTvFlagFile
 
 from .logger import VirginTvLogger
-
-from .pyvmtvguide.api import (
-    API,
-    TVChannelLists,
-)
 
 from .pyvmtivo.client import Client
 
@@ -146,12 +147,6 @@ _SERVICE_DEFINITIONS = [
         }
     },
 ]
-
-
-def _get_current_epoch() -> int:
-    """Get the current epoch time"""
-
-    return int(dt_util.now().timestamp())
 
 
 async def _async_service_wrapper(entity: "VirginMediaPlayer", service_call: ServiceCall) -> None:
@@ -214,7 +209,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         self._channel_current: Dict[str, Any] = {
             "number": None,
         }
-        self._channel_mappings: Dict[str, Any] = {}
         self._channels_available: List[Dict[str, Any]] = []
         self._client: Client
         self._config: ConfigEntry = config_entry
@@ -242,6 +236,25 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             timeout=self._config.options.get(CONF_CONNECT_TIMEOUT),
             command_timeout=self._config.options.get(CONF_COMMAND_TIMEOUT),
         )
+
+        if self._config.options.get(CONF_CHANNEL_FETCH_ENABLE, DEF_CHANNEL_FETCH_ENABLE):
+            self._cache_details: Dict[str: VirginMediaCache] = {
+                "auth": VirginMediaCacheAuth(
+                    hass=hass,
+                    unique_id=self.unique_id,
+                ),
+                "channels": VirginMediaCacheChannels(
+                    age=self._config.options.get(CONF_CHANNEL_INTERVAL, DEF_CHANNEL_INTERVAL),
+                    hass=hass,
+                    unique_id=self.unique_id,
+                ),
+                "channel_mappings": VirginMediaCacheChannelMappings(
+                    age=self._config.options.get(CONF_CHANNEL_INTERVAL, DEF_CHANNEL_INTERVAL),
+                    hass=hass,
+                    unique_id=self.unique_id,
+                ),
+            }
+
         self._current_channel_reset()
 
     # region #-- private methods --#
@@ -255,16 +268,16 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         paths: list = []
         if cleanup_type == "auth":
-            paths.append(self._cache_get_path(cache_type="auth"))
+            paths.append(self._cache_details.get("auth").path)
         elif cleanup_type == "channel":
-            paths.append(self._cache_get_path(cache_type="channels"))
-            paths.append(self._cache_get_path(cache_type="channel_mappings"))
-            listings_path = self._cache_get_path("listings", station_id="dummy")
+            paths.append(self._cache_details.get("channels").path)
+            paths.append(self._cache_details.get("channel_mappings").path)
+            listings_path = VirginMediaCacheListings(hass=self._hass, station_id="dummy", unique_id=self.unique_id).path
             listings_files = glob.glob(f"{os.path.join(os.path.dirname(listings_path), '*.json')}")
             paths.extend(listings_files)
             paths = list(set(paths))
             try:
-                paths.remove(self._cache_get_path(cache_type="auth"))
+                paths.remove(self._cache_details.get("auth").path)
             except ValueError:
                 pass
 
@@ -283,61 +296,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                     os.rmdir(dir_path)
 
         _LOGGER.debug(self._logger_message_format("exited"))
-
-    def _cache_get_path(self, cache_type: str, **kwargs) -> str:
-        """Returns the path for the specified cache
-
-        Valid cahce types are: "auth", "channels", "listings"
-
-        :param cache_type: the cache type to return the path for
-        :return: the path to the cache file
-        """
-
-        if not cache_type.lower() in ("auth", "channels", "listings", "channel_mappings"):
-            raise ValueError("Invalid cache type")
-
-        path: str = ""
-        if cache_type.lower() == "auth":
-            path = self.hass.config.path(DOMAIN, DEF_AUTH_FILE)
-        elif cache_type.lower() == "channels":
-            path = self.hass.config.path(DOMAIN, DEF_CHANNEL_FILE)
-        elif cache_type.lower() == "channel_mappings":
-            path = self.hass.config.path(DOMAIN, DEF_CHANNEL_MAPPINGS_FILE)
-        elif cache_type.lower() == "listings":
-            if kwargs.get("station_id"):
-                path = self.hass.config.path(DOMAIN, f"{kwargs.get('station_id')}.json")
-
-        return path
-
-    def _cache_load(self, cache_type: str, **kwargs) -> Dict[str, Any]:
-        """Load the specified cache type and return the contents
-
-        :param cache_type: the type of cache to load
-        :param kwargs: additional info to pass into the method
-        :return: a mapping containing the cached details
-        """
-
-        _LOGGER.debug(self._logger_message_format("entered, cache_type: %s"), cache_type)
-
-        ret = {}
-        path = self._cache_get_path(cache_type=cache_type, **kwargs)
-        if path:
-            if os.path.exists(path):
-                _LOGGER.debug(self._logger_message_format("loading cache from %s"), path)
-                with open(path, "r") as cache_file:
-                    try:
-                        ret = json.load(cache_file)
-                        _LOGGER.debug(self._logger_message_format("cache loaded (%s)"), path)
-                    except json.JSONDecodeError:
-                        _LOGGER.error(self._logger_message_format("invalid JSON (%s)"), path)
-            else:
-                _LOGGER.debug(self._logger_message_format("cache file does not exist"))
-        else:
-            _LOGGER.debug(self._logger_message_format("unable to establish cache file"))
-
-        _LOGGER.debug(self._logger_message_format("exited"))
-
-        return ret
 
     def _cache_process_available_channels(self, channel_cache: dict) -> None:
         """Ensure the available channels matches the device type and region for the device"""
@@ -360,7 +318,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
             # region #-- process only the V6 channels in the specified region --#
             region = self._config.options.get(CONF_CHANNEL_REGION, DEF_CHANNEL_REGION)
-            for cmap in self._channel_mappings.get("channels", []):
+            for cmap in self._cache_details.get("channel_mappings").contents.get("channels", []):
                 regions = cmap.get("region", "").lower().split(",")
                 if len(set(regions).intersection(_CHANNEL_REGION_MAPPING.get(region, []))) > 0 or not regions[0]:
                     platform_v6_channel: list = []
@@ -466,7 +424,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         current_program = self._channel_current.get("program")
         if current_program:
-            self._media_position = _get_current_epoch() - (current_program.get("startTime") / 1000)
+            self._media_position = get_current_epoch() - (current_program.get("startTime") / 1000)
             self._media_position_updated_at = dt_util.utcnow()
             if "media_position" not in self._intervals:
                 self._ils_create(
@@ -487,7 +445,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         """Set the current program from the cached listings"""
 
         _LOGGER.debug(self._logger_message_format("entered"))
-        current_epoch = _get_current_epoch()
+        current_epoch = get_current_epoch()
         current_program = [
             program
             for program in self._channel_current["listings"]
@@ -546,7 +504,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         self,
         create_type: str,
         name: str,
-        func: Callable,
+        func,
         when: Optional[Union[dt_util.dt.timedelta, dt_util.dt.datetime]] = None
     ):
         """Create an interval, listener or signal using the given details
@@ -589,35 +547,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         _LOGGER.debug(self._logger_message_format("exited"))
 
-    def _is_cache_update_required(self, cache_type: str, duration_hours: int, **kwargs) -> bool:
-        """Determine if an update of the given cache is required
-
-        :param cache_type: the type of cache to check
-        :param duration_hours: how long the cache should be valid for (in hours)
-        :param kwargs: additional arguments
-        :return: True if an update is required, False otherwise
-        """
-
-        _LOGGER.debug(self._logger_message_format("entered, cache_type: %s"), cache_type)
-
-        cache = self._cache_load(cache_type=cache_type, **kwargs)
-        if not cache:
-            return True
-
-        cache_date = int(cache.get("updated", 0) / 1000)
-        _LOGGER.debug(self._logger_message_format("last update: %d"), cache_date)
-        current_epoch: int = _get_current_epoch()
-        _LOGGER.debug(self._logger_message_format("current: %d"), current_epoch)
-        update_at = cache_date + (duration_hours * 60 * 60)
-        _LOGGER.debug(self._logger_message_format("needs updating at: %d"), update_at)
-
-        if update_at < current_epoch:
-            _LOGGER.debug(self._logger_message_format("cache is stale by %d seconds"), current_epoch - update_at)
-            return True
-        else:
-            _LOGGER.debug(self._logger_message_format("exited --> no update required"))
-            return False
-
     async def _async_cache_channel_mappings(self) -> None:
         """Fetch the channel mappings from the online service and cache locally
 
@@ -625,18 +554,9 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         """
 
         _LOGGER.debug(self._logger_message_format("entered"))
-        async with TVChannelLists() as tvc:
-            await tvc.async_fetch()
-        channel_mappings: dict = tvc.channels
 
-        # region #-- cache the channel details --#
-        cache_path_channel_mappings = self._cache_get_path(cache_type="channel_mappings")
-        os.makedirs(os.path.dirname(cache_path_channel_mappings), exist_ok=True)
-        with open(cache_path_channel_mappings, "w") as cache_file:
-            json.dump(channel_mappings, cache_file, indent=2)
-        self._channel_mappings = channel_mappings  # load the mappings into the instance
-        _LOGGER.debug(self._logger_message_format("channel mappings cached"))
-        # endregion
+        await self._cache_details.get("channel_mappings").fetch()
+        self._cache_process_available_channels(channel_cache=self._cache_details.get("channels").contents)
 
         _LOGGER.debug(self._logger_message_format("exited"))
 
@@ -648,48 +568,16 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         _LOGGER.debug(self._logger_message_format("entered"))
 
-        if self._global_flag_channel_cache.is_flagged():
-            _LOGGER.debug(self._logger_message_format("exiting, already running"))
-            return
-
-        self._global_flag_channel_cache.create()
-        cached_session = self._cache_load(cache_type="auth")
-        try:
-            async with API(
-                    username=self._config.options.get(CONF_CHANNEL_USER, ""),
-                    password=self._config.options.get(CONF_CHANNEL_PWD, ""),
-                    existing_session=cached_session,
-            ) as channels_api:
-                channels = await channels_api.async_get_channels()
-        except Exception as err:
-            _LOGGER.error(self._logger_message_format("type: %s, message: %s", include_lineno=True), type(err), err)
-            return
-
-        # region #-- cache the channel details --#
-        cache_path_channels = self._cache_get_path(cache_type="channels")
-        os.makedirs(os.path.dirname(cache_path_channels), exist_ok=True)
-        with open(cache_path_channels, "w") as cache_file:
-            json.dump(channels, cache_file, indent=2)
-        await self.async_update_ha_state()
-        _LOGGER.debug(self._logger_message_format("channels cached"), len(channels))
-        # endregion
+        session_details = await self._cache_details.get("channels").fetch(
+            username=self._config.options.get(CONF_CHANNEL_USER, ""),
+            password=self._config.options.get(CONF_CHANNEL_PWD, ""),
+            cached_session=self._cache_details.get("auth").contents,
+        )
 
         # region #-- cache the session auth details --#
-        cache_path_auth = self._cache_get_path(cache_type="auth")
-        os.makedirs(os.path.dirname(cache_path_auth), exist_ok=True)
-        with open(cache_path_auth, "w") as auth_file:
-            json.dump(channels_api.session_details, auth_file, indent=2)
-        _LOGGER.debug(self._logger_message_format("auth details cached"), len(channels))
+        self._cache_details.get("auth").contents = session_details
         # endregion
 
-        # region #-- get the channel mappings cached as well if we need to --#
-        if self._config.options.get(CONF_DEVICE_PLATFORM, DEF_DEVICE_PLATFORM).lower() == "v6":
-            await self._async_cache_channel_mappings()
-        # endregion
-
-        self._cache_process_available_channels(channel_cache=channels)
-
-        self._global_flag_channel_cache.delete()
         _LOGGER.debug(self._logger_message_format("exited"))
 
     async def _async_cache_listings(self) -> None:
@@ -704,30 +592,18 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             _LOGGER.debug(self._logger_message_format("exited, no station_id set"))
             return
 
-        cached_session = self._cache_load(cache_type="auth")
-        async with API(
+        self._cache_details["listings"] = VirginMediaCacheListings(
+            age=self._config.options.get(CONF_CHANNEL_LISTINGS_CACHE, DEF_CHANNEL_LISTINGS_CACHE),
+            hass=self._hass,
+            station_id=self._channel_current["station_id"],
+            unique_id=self.unique_id,
+        )
+
+        await self._cache_details["listings"].fetch(
             username=self._config.options.get(CONF_CHANNEL_USER, ""),
             password=self._config.options.get(CONF_CHANNEL_PWD, ""),
-            existing_session=cached_session,
-        ) as listings_api:
-            _LOGGER.debug(
-                self._logger_message_format("using stored station id: %s"),
-                self._channel_current["station_id"]
-            )
-
-            listings = await listings_api.async_get_listing(
-                channel_id=self._channel_current["station_id"],
-                start_time=_get_current_epoch(),
-                duration_hours=self._config.options.get(CONF_CHANNEL_LISTINGS_CACHE, DEF_CHANNEL_LISTINGS_CACHE)
-            )
-
-        # region #-- cache the details --#
-        listings_path = self._cache_get_path(cache_type="listings", station_id=self._channel_current["station_id"])
-        os.makedirs(os.path.dirname(listings_path), exist_ok=True)
-        with open(listings_path, "w") as cache_file:
-            json.dump(listings, cache_file, indent=2)
-        self._channel_current["listings"] = listings.get("listings", [])  # load the cache into the instance
-        # endregion
+            cached_session=self._cache_details.get("auth").contents,
+        )
 
         _LOGGER.debug(self._logger_message_format("exited"))
 
@@ -849,18 +725,15 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                     else:
                         self._channel_current["station_id"] = station_id
                         # region #-- load the listings cache --#
-                        if self._is_cache_update_required(
-                            cache_type="listings",
-                            duration_hours=self._config.options.get(
-                                CONF_CHANNEL_LISTINGS_CACHE,
-                                DEF_CHANNEL_LISTINGS_CACHE
-                            ),
-                            station_id=station_id
-                        ):
+                        self._cache_details["listings"] = VirginMediaCacheListings(
+                            age=self._config.options.get(CONF_CHANNEL_LISTINGS_CACHE, DEF_CHANNEL_LISTINGS_CACHE),
+                            hass=self._hass,
+                            station_id=station_id,
+                            unique_id=self.unique_id,
+                        )
+                        if self._cache_details["listings"].is_stale:
                             await self._async_cache_listings()
-                        else:
-                            cache_listings = self._cache_load(cache_type="listings", station_id=station_id)
-                            self._channel_current["listings"] = cache_listings.get("listings", [])
+                        self._channel_current["listings"] = self._cache_details["listings"].contents.get("listings", [])
 
                         # set the listings to update
                         if "listings_update" in self._listeners:
@@ -873,14 +746,11 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                                 await self._async_cache_listings()
                                 self._current_program_set()
 
-                            prog_last = self._channel_current["listings"][-1]
-                            prog_last = prog_last.get("endTime", (_get_current_epoch() * 1000))
-                            cache_again_at = dt_util.dt.datetime.fromtimestamp((prog_last / 1000) - 60)
                             self._ils_create(
                                 create_type="listener",
                                 name="listings_update",
                                 func=_async_listener_updates,
-                                when=cache_again_at,
+                                when=dt_util.dt.datetime.fromtimestamp(self._cache_details["listings"].expires_at),
                             )
                         # endregion
 
@@ -958,8 +828,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         # region #-- setup the channel numbers and listings if needed --#
         if self._config.options.get(CONF_CHANNEL_FETCH_ENABLE, DEF_CHANNEL_FETCH_ENABLE):
-            cache_channel_duration = self._config.options.get(CONF_CHANNEL_INTERVAL, DEF_CHANNEL_INTERVAL)
 
+            # region #-- setup the channels cache --#
             async def _async_cache_channels_start(_: Optional[dt_util.dt.datetime] = None) -> None:
                 """Cache the channels and set a timer up
 
@@ -979,17 +849,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                 self._ils_cancel(name="channels_init_cache", cancel_type="listener")
                 _LOGGER.debug(self._logger_message_format("exited"))
 
-            if not self._is_cache_update_required(cache_type="channels", duration_hours=cache_channel_duration):
-                # load the channels
-                cache_channels = self._cache_load(cache_type="channels")
-                self._channel_mappings = self._cache_load(cache_type="channel_mappings")
-                self._cache_process_available_channels(channel_cache=cache_channels)
-                _LOGGER.debug(self._logger_message_format("channels loaded"))
-                # region #-- set up time to reload the channels 24 hours after cached time --#
-                cache_started = cache_channels.get("updated", 0)
-                cache_again_at = dt_util.dt.datetime.fromtimestamp(
-                    (cache_started / 1000) + (cache_channel_duration * 60 * 60)
-                )
+            if not self._cache_details.get("channels").is_stale:  # property forces a load from cache
+                cache_again_at = dt_util.dt.datetime.fromtimestamp(self._cache_details.get("channels").expires_at)
                 self._ils_create(
                     create_type="listener",
                     name="channels_init_cache",
@@ -997,9 +858,49 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                     when=cache_again_at
                 )
                 _LOGGER.debug(self._logger_message_format("channels will re-cache at: %s"), cache_again_at)
-                # endregion
             else:
                 await _async_cache_channels_start()
+            _LOGGER.debug(self._logger_message_format("channels loaded"))
+            # endregion
+
+            # region #-- set up the channel mappings cache --#
+            if self._config.options.get(CONF_DEVICE_PLATFORM, DEF_DEVICE_PLATFORM).lower() == "v6":
+                async def _async_cache_channel_mappings_start(_: Optional[dt_util.dt.datetime] = None) -> None:
+                    """Cache the channel mappings and set a timer up
+
+                    :return: None
+                    """
+
+                    _LOGGER.debug(self._logger_message_format("entered"))
+                    await self._async_cache_channel_mappings()
+                    self._ils_create(
+                        create_type="interval",
+                        name="channel_mappings_cache",
+                        func=self._async_cache_channel_mappings,
+                        when=dt_util.dt.timedelta(
+                            hours=self._config.options.get(CONF_CHANNEL_INTERVAL, DEF_CHANNEL_INTERVAL)
+                        )
+                    )
+                    self._ils_cancel(name="channel_mappings_init_cache", cancel_type="listener")
+                    _LOGGER.debug(self._logger_message_format("exited"))
+
+                if not self._cache_details.get("channel_mappings").is_stale:  # property forces a load from cache
+                    self._cache_process_available_channels(channel_cache=self._cache_details.get("channels").contents)
+
+                    cache_again_at = dt_util.dt.datetime.fromtimestamp(
+                        self._cache_details.get("channel_mappings").expires_at
+                    )
+                    self._ils_create(
+                        create_type="listener",
+                        name="channels_init_cache",
+                        func=_async_cache_channel_mappings_start,
+                        when=cache_again_at
+                    )
+                    _LOGGER.debug(self._logger_message_format("channel mappings will re-cache at: %s"), cache_again_at)
+                else:
+                    await _async_cache_channel_mappings_start()
+                _LOGGER.debug(self._logger_message_format("channel mappings loaded"))
+            # endregion
         # endregion
 
         # region #-- update now --#
