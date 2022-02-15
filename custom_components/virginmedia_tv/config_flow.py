@@ -522,7 +522,8 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow, VirginTvLogger):
         if user_input is not None:
             configured_instances = self.hass.config_entries.async_entries(domain=DOMAIN)
             self._cache_to_clean.update(user_input)
-            if len(configured_instances) > 1:  # there are other configured items
+            any_cache_selected = any(dict(user_input).values())
+            if any_cache_selected and len(configured_instances) > 1:  # need to clean and other configured items
                 return await self.async_step_cache_confirm()
             else:
                 self._cache_do_cleanup()
