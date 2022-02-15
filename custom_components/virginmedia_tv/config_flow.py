@@ -498,7 +498,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow, VirginTvLogger):
         # region #-- get the names of the currently configured instances --#
         configured_instances = self.hass.config_entries.async_entries(domain=DOMAIN)
         configured_instances_text = [
-            f"{idx}. {instance.title}"
+            f"{idx}. {instance.title} <i>({'disabled' if instance.disabled_by else 'enabled'})</i>"
             for idx, instance in enumerate(configured_instances)
             if instance.unique_id != self._config_entry.unique_id
         ]
