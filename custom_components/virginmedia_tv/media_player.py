@@ -105,8 +105,6 @@ from .const import (
     SIGNAL_CLEAR_CACHE,
 )
 
-from .flagging import VirginTvFlagFile
-
 from .logger import VirginTvLogger
 
 from .pyvmtivo.client import Client
@@ -219,7 +217,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         self._config: ConfigEntry = config_entry
         self._extra_state_attributes: Dict[str, Any] = {}
         self._flags: Dict[str, bool] = {}
-        self._global_flag_channel_cache = VirginTvFlagFile(path=hass.config.path(DOMAIN, ".channels_caching"))
         self._hass: HomeAssistant = hass
         self._intervals: Dict[str, Callable] = {}
         self._key_to_action: Dict[str, Callable] = {
@@ -259,8 +256,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                     unique_id=self.unique_id,
                 ),
             }
-
-        self._current_channel_reset()
 
     # region #-- private methods --#
     def _cache_cleanup(self, cleanup_type: str) -> None:
@@ -405,24 +400,19 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         :return: the channel title
         """
 
-        ret = channel_number
-        if self._channels_available:
-            channel_name = self._channel_details(channel_number=channel_number).get('title')
-            if channel_name:
-                ret = f"{ret}{_CHANNEL_SEPARATOR} {channel_name}"
+        ret: Union[int, str] = channel_number
+        channel_name: str = ""
+
+        if channel_number == self._channel_current.get("number"):
+            channel_name = self._channel_current.get("details", {}).get("title")
+        else:
+            if self._channels_available:
+                channel_name = self._channel_details(channel_number=channel_number).get("title")
+
+        if channel_name:
+            ret = f"{ret}{_CHANNEL_SEPARATOR} {channel_name}"
 
         return str(ret)
-
-    def _current_channel_reset(self) -> None:
-        """Reset all the instance channel details
-
-        This ignores the channel number because that should be (re)set by the update method
-        """
-
-        self._channel_current["details"] = {}
-        self._channel_current["listings"] = {}
-        self._channel_current["program"] = {}
-        self._channel_current["station_id"] = None
 
     def _current_program_get_position(self, _: Optional[dt_util.dt.datetime] = None) -> None:
         """Get the current position in the playing media"""
@@ -453,7 +443,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         current_epoch = get_current_epoch()
         current_program = [
             program
-            for program in self._channel_current["listings"]
+            for program in self._cache_details["listings"].contents.get("listings", [])
             if (program.get("endTime") / 1000) >= current_epoch >= (program.get("startTime") / 1000)
         ]
         if current_program:
@@ -585,7 +575,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         _LOGGER.debug(self._logger_message_format("exited"))
 
-    async def _async_cache_listings(self) -> None:
+    async def _async_cache_listings(self, _: Optional[dt_util.dt.datetime] = None) -> None:
         """Fetch the channel listings from the online service and cache locally
 
         :return: None
@@ -652,14 +642,87 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                 )
                 return
 
-        if not self._client.device.channel_number:
+        if self._client.device.channel_number:
+            # region #-- entity should be on --#
+            # region #-- cancel listeners that may be running whilst off --#
+            if "idle_to_off" in self._listeners:
+                self._ils_cancel(name="idle_to_off", cancel_type="listener")
+            # endregion
+
+            if self._client.device.channel_number != self.media_channel:
+                _LOGGER.debug(
+                    self._logger_message_format("channel changed from %s to %s"),
+                    self._channel_current["number"],
+                    self._client.device.channel_number
+                )
+                self._channel_current["number"] = self._client.device.channel_number
+                self._channel_current["details"] = self._channel_details(channel_number=self._channel_current["number"])
+
+                # region #-- get the station_id --#
+                station_id: str = ""
+                if self._channel_current["details"]:
+                    station_schedules = self._channel_current["details"].get("stationSchedules")
+                    if station_schedules:
+                        station_details = station_schedules[0]
+                        station_details = station_details.get("station", {})
+                        station_id = station_details.get("id")
+                # endregion
+
+                if not station_id:
+                    _LOGGER.warning(
+                        self._logger_message_format("unable to retrieve station id for %d"),
+                        self._channel_current["number"]
+                    )
+                else:
+                    # region #-- load the listings cache --#
+                    _LOGGER.debug(
+                        self._logger_message_format("station id for %d: %s"),
+                        self._channel_current["number"],
+                        station_id
+                    )
+                    self._cache_details["listings"] = VirginMediaCacheListings(
+                        age=self._config.options.get(CONF_CHANNEL_LISTINGS_CACHE, DEF_CHANNEL_LISTINGS_CACHE),
+                        hass=self._hass,
+                        station_id=station_id,
+                        unique_id=self.unique_id,
+                    )
+                    if self._cache_details["listings"].is_stale:
+                        await self._async_cache_listings()
+                    # endregion
+
+                    # region #-- set the listings to cache again --#
+                    if "listings_update" in self._listeners:
+                        self._ils_cancel(cancel_type="listener", name="listings_update")
+                    if self._cache_details.get("listings").contents:
+                        self._ils_create(
+                            create_type="listener",
+                            name="listings_update",
+                            func=self._async_cache_listings,
+                            when=dt_util.dt.datetime.fromtimestamp(self._cache_details.get("listings").expires_at),
+                        )
+                    # endregion
+
+                    # region #-- set the current program details --#
+                    self._current_program_set()
+                    # endregion
+
+                self._state = STATE_PLAYING
+            # endregion
+        else:
+            # region #-- entity should be off --#
+            # region #-- cancel listeners that may be running whilst on --#
+            if "current_program" in self._listeners:
+                self._ils_cancel(cancel_type="listener", name="current_program")
+            if "listings_update" in self._listeners:
+                self._ils_cancel(cancel_type="listener", name="listings_update")
+            # endregion
+
+            # region #-- set the extra attributes --#
             if self._channel_current["number"]:
                 self._extra_state_attributes["channel_at_idle_off"] = self._channel_current["number"]
-            self._channel_current["number"] = None
-            self._current_channel_reset()
-            self._current_program_get_position()
-            if "current_program" in self._listeners:
-                self._ils_cancel(name="current_program", cancel_type="listener")
+            # endregion
+
+            # region #-- set the state --#
             if not self._config.options.get(CONF_IDLE_TIMEOUT):
                 self._state = STATE_OFF
             else:
@@ -677,7 +740,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                                 self._state = STATE_OFF
                                 asyncio.run_coroutine_threadsafe(coro=self.async_update_ha_state(), loop=self.hass.loop)
                             if "idle_to_off" in self._listeners:
-                                self._ils_cancel(name="idle_to_off", cancel_type="listener")
+                                self._ils_cancel(cancel_type="listener", name="idle_to_off")
                             _LOGGER.debug(self._logger_message_format("exited"))
 
                         if "idle_to_off" not in self._listeners:
@@ -691,78 +754,10 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                                 when=fire_at
                             )
                     # endregion
-        else:
-            if "idle_to_off" in self._listeners:
-                self._ils_cancel(name="idle_to_off", cancel_type="listener")
-            if self._channel_current["number"] != self._client.device.channel_number:
-                self._state = STATE_PLAYING
-                _LOGGER.debug(
-                    self._logger_message_format("channel changed from %s to %s"),
-                    self._channel_current["number"],
-                    self._client.device.channel_number
-                )
-                self._current_channel_reset()
-                self._channel_current["number"] = self._client.device.channel_number
-                if self._config.options.get(CONF_CHANNEL_FETCH_ENABLE, DEF_CHANNEL_FETCH_ENABLE):
-                    if "current_program" in self._listeners:
-                        self._ils_cancel(name="current_program", cancel_type="listener")
-                    # region #-- get the channel details --#
-                    channel_details = self._channel_details(channel_number=self._client.device.channel_number)
-                    if channel_details:
-                        self._channel_current["details"] = channel_details
-                    # endregion
+            # endregion
 
-                    # region #-- get the listings for the channel --#
-                    station_id: str = ""
-                    if self._channel_current["details"]:
-                        # region #-- get the station_id --#
-                        station_schedules = self._channel_current["details"].get("stationSchedules")
-                        if station_schedules:
-                            station_details = station_schedules[0]
-                            station_details = station_details.get("station", {})
-                            station_id = station_details.get("id")
-                        # endregion
-                    if not station_id:
-                        _LOGGER.warning(
-                            self._logger_message_format("unable to retrieve station id for %d"),
-                            self._channel_current["number"]
-                        )
-                    else:
-                        self._channel_current["station_id"] = station_id
-                        # region #-- load the listings cache --#
-                        self._cache_details["listings"] = VirginMediaCacheListings(
-                            age=self._config.options.get(CONF_CHANNEL_LISTINGS_CACHE, DEF_CHANNEL_LISTINGS_CACHE),
-                            hass=self._hass,
-                            station_id=station_id,
-                            unique_id=self.unique_id,
-                        )
-                        if self._cache_details["listings"].is_stale:
-                            await self._async_cache_listings()
-                        self._channel_current["listings"] = self._cache_details["listings"].contents.get("listings", [])
-
-                        # set the listings to update
-                        if "listings_update" in self._listeners:
-                            self._ils_cancel(cancel_type="listener", name="listings_update")
-                        if self._channel_current.get("listings"):
-
-                            async def _async_listener_updates(_: dt_util.dt.datetime) -> None:
-                                """Wrapper to re-cache the listings and set the current program"""
-
-                                await self._async_cache_listings()
-                                self._current_program_set()
-
-                            self._ils_create(
-                                create_type="listener",
-                                name="listings_update",
-                                func=_async_listener_updates,
-                                when=dt_util.dt.datetime.fromtimestamp(self._cache_details["listings"].expires_at),
-                            )
-                        # endregion
-
-                        # region #-- set the current program --#
-                        self._current_program_set()
-                        # endregion
-                    # endregion
+            self._channel_current["number"] = None
+            # endregion
 
         await self.async_update_ha_state()
 
@@ -1095,7 +1090,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                     _LOGGER.warning(self._logger_message_format("%s"), err)
                 except Exception:
                     raise
-        await self._async_fetch_player_state()
 
         _LOGGER.debug(self._logger_message_format("exited"))
 
@@ -1313,7 +1307,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         if self.state not in (STATE_IDLE, STATE_OFF):
             ret = self._channel_title(channel_number=self._channel_current.get("number"))
 
-        return ret
+        return str(ret)
 
     @property
     def name(self) -> str:
