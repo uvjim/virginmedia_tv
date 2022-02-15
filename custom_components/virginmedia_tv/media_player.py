@@ -146,6 +146,11 @@ _SERVICE_DEFINITIONS = [
             vol.Required("code"): cv.string
         }
     },
+    {
+        "func": "_async_service_update_channels",
+        "name": "update_channels",
+        "schema": None,
+    },
 ]
 
 
@@ -815,6 +820,27 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                         )
                         raise err from None
         _LOGGER.debug(self._logger_message_format("exited"))
+
+    async def _async_service_update_channels(self, **_) -> None:
+        """Force caching of the channel details and mappings
+
+        N.B. this will only immediately update this entity. Other entities will
+        update when they next change channel.
+
+        :param _: unnecessary arguments
+        :return: None
+        """
+
+        # region #-- force channel sync --#
+        await self._async_cache_channels()
+        await self._async_cache_channel_mappings()
+        # endregion
+
+        # region #-- update the details in this instance --#
+        channel_details = self._channel_details(channel_number=self._channel_current.get("number", 0))
+        if channel_details:
+            self._channel_current["details"] = channel_details
+        # endregion
     # endregion
 
     # region #-- initialise/cleanup methods --#
