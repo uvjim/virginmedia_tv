@@ -1,17 +1,31 @@
 """Sensor entities"""
+# TODO: Remove the try/except block when setting the minimum HASS version to 2021.12
+try:
+    from homeassistant.helpers.entity import EntityCategory
+except ImportError:
+    EntityCategory = None
+    # TODO: Remove the try/except block when setting the minimum HASS version to 2021.11
+    try:
+        from homeassistant.const import (
+            ENTITY_CATEGORY_CONFIG,
+            ENTITY_CATEGORY_DIAGNOSTIC,
+        )
+    except ImportError:
+        ENTITY_CATEGORY_CONFIG: str = ""
+        ENTITY_CATEGORY_DIAGNOSTIC: str = ""
 
 import asyncio
 import logging
-from typing import Optional
+from typing import (
+    Optional,
+    Union,
+)
 
 from homeassistant.components.sensor import (
     SensorEntity,
     StateType,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    ENTITY_CATEGORY_DIAGNOSTIC,
-)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
@@ -98,10 +112,11 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
         return ret
 
     @property
-    def entity_category(self) -> Optional[str]:
-        """Entity category"""
-
-        return ENTITY_CATEGORY_DIAGNOSTIC
+    def entity_category(self) -> Union[EntityCategory, str, None]:
+        if EntityCategory is not None:
+            return EntityCategory.DIAGNOSTIC
+        else:
+            return ENTITY_CATEGORY_DIAGNOSTIC
 
     @property
     def entity_registry_enabled_default(self) -> bool:
