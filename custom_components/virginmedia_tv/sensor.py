@@ -1,5 +1,6 @@
 """Sensor entities"""
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -60,7 +61,7 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
         _LOGGER.debug(self._logger_message_format("sensor is: %s"), "enabled" if self.enabled else "disabled")
         if self.enabled:
             self._state = swversion
-            self.async_update_ha_state()
+            asyncio.run_coroutine_threadsafe(coro=self.async_update_ha_state(), loop=self._hass.loop)
         _LOGGER.debug(self._logger_message_format("exited"))
     # endregion
 
