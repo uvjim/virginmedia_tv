@@ -33,6 +33,7 @@ from .pyvmtvguide.api import (
     API,
     TVChannelLists,
 )
+from .pyvmtvguide.exceptions import VirginMediaTVGuideError
 # endregion
 
 _LOGGER = logging.getLogger(__name__)
@@ -213,6 +214,9 @@ class VirginMediaCacheChannels(VirginMediaCache):
         try:
             async with API(username=username, password=password, existing_session=cached_session) as channels_api:
                 channels = await channels_api.async_get_channels()
+        except VirginMediaTVGuideError as err:
+            _LOGGER.error("Invalid credentials used when attempting to cache the available channels")
+            _LOGGER.debug(self._logger_message_format("type: %s, message: %s", include_lineno=True), type(err), err)
         except Exception as err:
             _LOGGER.error(self._logger_message_format("type: %s, message: %s", include_lineno=True), type(err), err)
         else:

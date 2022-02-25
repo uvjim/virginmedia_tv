@@ -300,6 +300,9 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
     def _cache_process_available_channels(self, channel_cache: dict) -> None:
         """Ensure the available channels matches the device type and region for the device"""
 
+        if not channel_cache:
+            return
+
         if self._config.options.get(CONF_DEVICE_PLATFORM, DEF_DEVICE_PLATFORM).lower() == "v6":
             _LOGGER.debug(self._logger_message_format("processing V6 channel mappings"))
             # v6 devices don't merge resolutions onto the same channel number so use the mappings to build
@@ -836,7 +839,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         # region #-- force channel sync --#
         await self._async_cache_channels()
-        await self._async_cache_channel_mappings()
+        if self._config.options.get(CONF_DEVICE_PLATFORM, DEF_DEVICE_PLATFORM).lower() == "v6":
+            await self._async_cache_channel_mappings()
         # endregion
 
         # region #-- update the details in this instance --#
