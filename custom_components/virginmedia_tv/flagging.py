@@ -32,6 +32,7 @@ class VirginTvFlagFile(VirginTvLogger):
             return
 
         _LOGGER.debug(self._logger_message_format("creating flag file: %s"), self._flag_path)
+        os.makedirs(name=os.path.dirname(self._flag_path), exist_ok=True)
         with open(self._flag_path, "x") as flag_file:
             if contents is not None:
                 _LOGGER.debug(self._logger_message_format("writing contents to flag file"))
