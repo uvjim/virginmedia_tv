@@ -62,6 +62,8 @@ from .const import (
     STEP_VIRGIN_CREDS,
 )
 from .logger import VirginTvLogger
+from .pyvmtvguide.api import API as VirginMediaAPI
+from .pyvmtvguide.exceptions import VirginMediaTVGuideError
 
 # TODO: remove this try/except block when setting the minimum HASS version to 2021.12
 # HASS 2021.12 uses dataclasses for discovery information
@@ -247,6 +249,8 @@ class VirginTvHandler(config_entries.ConfigFlow, VirginTvLogger, domain=DOMAIN):
         zeroconf --> options (something selected) --> virgin_creds --> timeouts --> finish
     """
 
+    task_login = None
+
     def __init__(self) -> None:
         """Constructor"""
 
@@ -260,6 +264,24 @@ class VirginTvHandler(config_entries.ConfigFlow, VirginTvLogger, domain=DOMAIN):
         """Get the options flow for this handler"""
 
         return VirginTvOptionsFlowHandler(config_entry=config_entry)
+
+    async def _async_task_login(self, user_input) -> None:
+        """Login to the Virgin Media online service
+
+        :param user_input: credentials for login
+        :return: None
+        """
+
+        _LOGGER.debug(self._logger_message_format("entered, user_input: %s"), user_input)
+        async with VirginMediaAPI(**user_input) as vm_api:
+            try:
+                await vm_api.async_login()
+            except VirginMediaTVGuideError as err:
+                _LOGGER.debug(self._logger_message_format("type: %s, message: %s", include_lineno=True), type(err), err)
+                self._errors["base"] = "login_error"
+
+        self.hass.async_create_task(self.hass.config_entries.flow.async_configure(flow_id=self.flow_id))
+        _LOGGER.debug(self._logger_message_format("exited"))
 
     async def async_step_finish(self) -> data_entry_flow.FlowResult:
         """Create the configuration entry
@@ -276,6 +298,39 @@ class VirginTvHandler(config_entries.ConfigFlow, VirginTvLogger, domain=DOMAIN):
             self._options
         )
         return self.async_create_entry(title=title, data=self._data, options=self._options)
+
+    async def async_step_login(self, user_input=None) -> data_entry_flow.FlowResult:
+        """Initiate the login task
+
+        :param user_input: details entered by the user
+        :return: the necessary FlowResult
+        """
+
+        _LOGGER.debug(self._logger_message_format("entered, user_input: %s"), user_input)
+        if not self.task_login:
+            _LOGGER.debug(self._logger_message_format("creating login task"))
+            details: dict = {
+                "username": self._options.get(CONF_CHANNEL_USER),
+                "password": self._options.get(CONF_CHANNEL_PWD),
+            }
+            self.task_login = self.hass.async_create_task(
+                self._async_task_login(user_input=details)
+            )
+            return self.async_show_progress(step_id="login", progress_action="task_login")
+
+        try:
+            _LOGGER.debug(self._logger_message_format("running login task"))
+            await self.task_login
+            _LOGGER.debug(self._logger_message_format("returned from login task"))
+        except Exception as err:
+            _LOGGER.debug(self._logger_message_format("exception: %s"), err)
+            return self.async_abort(reason="abort_login")
+
+        _LOGGER.debug(self._logger_message_format("_errors: %s"), self._errors)
+        if self._errors:
+            return self.async_show_progress_done(next_step_id=STEP_VIRGIN_CREDS)
+
+        return self.async_show_progress_done(next_step_id=STEP_TIMEOUTS)
 
     async def async_step_options(self, user_input=None) -> data_entry_flow.FlowResult:
         """Generic options for the integration"""
@@ -361,8 +416,10 @@ class VirginTvHandler(config_entries.ConfigFlow, VirginTvLogger, domain=DOMAIN):
 
         _LOGGER.debug(self._logger_message_format("user_input: %s"), user_input)
         if user_input is not None:
+            self.task_login = None
+            self._errors = {}
             self._options.update(user_input)
-            return await self.async_step_timeouts()
+            return await self.async_step_login()
 
         return self.async_show_form(
             step_id=STEP_VIRGIN_CREDS,

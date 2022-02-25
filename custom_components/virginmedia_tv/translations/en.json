@@ -4,6 +4,9 @@
       "already_configured": "TiVo already configured",
       "incomplete_tivo": "Incomplete details for a TiVo device"
     },
+    "error": {
+      "login_error": "Unable to login. Please check the username and password."
+    },
     "flow_title": "{name}",
     "step": {
       "options": {
