@@ -16,12 +16,9 @@ except ImportError:
 
 import asyncio
 import logging
-from typing import (
-    Optional,
-    Union,
-)
 
 from homeassistant.components.sensor import (
+    DOMAIN as ENTITY_DOMAIN,
     SensorEntity,
     StateType,
 )
@@ -63,8 +60,21 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
         """Constructor"""
 
         super().__init__()
+
         self._hass: HomeAssistant = hass
         self._config: ConfigEntry = config_entry
+
+        self._attr_entity_category = (
+            EntityCategory.DIAGNOSTIC
+            if EntityCategory is not None
+            else ENTITY_CATEGORY_DIAGNOSTIC
+        )
+        self._attr_entity_registry_enabled_default = False
+        self._attr_name = f"{self._config.title} Software Version"
+        self._attr_unique_id = f"{self._config.unique_id}::" \
+                               f"{ENTITY_DOMAIN.lower()}::" \
+                               f"{self.name}"
+
         self._state: str = self._config.data.get(CONF_SWVERSION, "")
 
     # region #-- private methods --#
@@ -112,33 +122,8 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
         return ret
 
     @property
-    def entity_category(self) -> Union[EntityCategory, str, None]:
-        if EntityCategory is not None:
-            return EntityCategory.DIAGNOSTIC
-        else:
-            return ENTITY_CATEGORY_DIAGNOSTIC
-
-    @property
-    def entity_registry_enabled_default(self) -> bool:
-        """Disable the entity by default"""
-
-        return False
-
-    @property
-    def name(self) -> Optional[str]:
-        """Friendly name"""
-
-        return f"{self._config.title} Software Version"
-
-    @property
     def native_value(self) -> StateType:
         """Sensor value"""
 
         return self._state
-
-    @property
-    def unique_id(self) -> str:
-        """Unique ID"""
-
-        return f"{self._config.unique_id}:sensor:{self.name}"
     # endregion
