@@ -6,6 +6,7 @@ import os
 from typing import Optional
 
 from .logger import VirginTvLogger
+
 # endregion
 
 _LOGGER = logging.getLogger(__name__)

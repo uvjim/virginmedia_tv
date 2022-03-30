@@ -1,7 +1,5 @@
 """Custom Exceptions"""
 
-import asyncio
-
 DEFAULT_ERROR_MESSAGES = {
     ConnectionError: "Connection error",
     BrokenPipeError: "Broken pipe",

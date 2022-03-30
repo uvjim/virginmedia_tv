@@ -1,15 +1,17 @@
 """"""
 
 # region #-- imports --#
+from __future__ import annotations
+
 import logging
-from typing import Union
+from typing import Optional
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant import config_entries, data_entry_flow
+from homeassistant.components.zeroconf import ZeroconfServiceInfo
 from homeassistant.core import callback, HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.typing import DiscoveryInfoType
 
 from .const import (
     CONF_CACHE_CLEAR,
@@ -65,18 +67,12 @@ from .logger import VirginTvLogger
 from .pyvmtvguide.api import API as VirginMediaAPI
 from .pyvmtvguide.exceptions import VirginMediaTVGuideError
 
-# TODO: remove this try/except block when setting the minimum HASS version to 2021.12
-# HASS 2021.12 uses dataclasses for discovery information
-try:
-    from homeassistant.components.zeroconf import ZeroconfServiceInfo
-except ImportError:
-    ZeroconfServiceInfo = None
 # endregion
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _get_tivo_name(discovery_info: Union[DiscoveryInfoType, ZeroconfServiceInfo]) -> str:
+def _get_tivo_name(discovery_info: ZeroconfServiceInfo) -> str:
     """Determine the friendliest device name to use
 
     :param discovery_info: details provided by the discovery service
@@ -99,7 +95,7 @@ def _get_tivo_name(discovery_info: Union[DiscoveryInfoType, ZeroconfServiceInfo]
     return ret
 
 
-def _is_existing_configured_tivo(hass: HomeAssistant, address: str) -> Union[config_entries.ConfigEntry, None]:
+def _is_existing_configured_tivo(hass: HomeAssistant, address: str) -> Optional[config_entries.ConfigEntry]:
     """Check if the specified device is already configured
 
     :param hass: the hass object
@@ -113,7 +109,7 @@ def _is_existing_configured_tivo(hass: HomeAssistant, address: str) -> Union[con
             return tivo
 
 
-def _is_valid_tivo(discovery_info: Union[DiscoveryInfoType, ZeroconfServiceInfo]) -> bool:
+def _is_valid_tivo(discovery_info: ZeroconfServiceInfo) -> bool:
     """Check if there's enough info to be a valid TiVo device
 
     :param discovery_info: info provided by the discovery service
@@ -430,7 +426,7 @@ class VirginTvHandler(config_entries.ConfigFlow, VirginTvLogger, domain=DOMAIN):
 
     async def async_step_zeroconf(
         self,
-        discovery_info: Union[DiscoveryInfoType, ZeroconfServiceInfo]
+        discovery_info: ZeroconfServiceInfo
     ) -> data_entry_flow.FlowResult:
         """Entry point for an automatically discovered device"""
 

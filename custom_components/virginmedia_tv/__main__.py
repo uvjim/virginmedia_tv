@@ -14,7 +14,6 @@ from pyvmtivo.exceptions import (
     VirginMediaInvalidChannel,
     VirginMediaNotLive,
 )
-
 from pyvmtvguide.api import API
 
 _LOGGER = logging.getLogger("pyvmtvguide.cli")

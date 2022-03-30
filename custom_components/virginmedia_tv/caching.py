@@ -28,12 +28,12 @@ from .const import (
 )
 from .flagging import VirginTvFlagFile
 from .logger import VirginTvLogger
-
 from .pyvmtvguide.api import (
     API,
     TVChannelLists,
 )
 from .pyvmtvguide.exceptions import VirginMediaTVGuideError
+
 # endregion
 
 _LOGGER = logging.getLogger(__name__)
