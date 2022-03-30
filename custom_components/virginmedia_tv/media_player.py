@@ -1288,10 +1288,12 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         if self._channel_current:
             current_program = self._channel_current.get("program")
             if current_program:
-                start_time = dt_util.utc_from_timestamp(current_program.get("startTime", 0) / 1000).strftime("%H:%M")
-                end_time = dt_util.utc_from_timestamp(current_program.get("endTime", 0) / 1000).strftime("%H:%M")
+                start_time: dt_util.dt.datetime = dt_util.utc_from_timestamp(current_program.get("startTime", 0) / 1000)
+                start_time = dt_util.as_local(start_time)
+                end_time: dt_util.dt.datetime = dt_util.utc_from_timestamp(current_program.get("endTime", 0) / 1000)
+                end_time = dt_util.as_local(end_time)
                 title = current_program.get("program", {}).get("title", "")
-                ret = f"({start_time}-{end_time}) {title}"
+                ret = f"({start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')}) {title}"
                 secondary_title = current_program.get("program", {}).get("secondaryTitle", "")
                 if secondary_title:
                     secondary_title = f" - {secondary_title}"
