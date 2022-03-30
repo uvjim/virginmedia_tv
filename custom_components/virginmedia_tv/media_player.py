@@ -1,6 +1,8 @@
 """Media Player entities"""
 
 # region #-- imports --#
+from __future__ import annotations
+
 import asyncio
 import glob
 import logging
@@ -12,7 +14,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Union,
 )
 
 import voluptuous as vol
@@ -336,7 +337,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                             # interested in the channels with same channel number
                             if online_channel.get("channelNumber") == platform_360_channel[1]:
                                 # check for the resolution and update accordingly
-                                station_schedule: Union[list, dict] = online_channel.get("stationSchedules", [])
+                                station_schedule: list | dict = online_channel.get("stationSchedules", [])
                                 if station_schedule:
                                     station: dict = station_schedule[0].get("station", {})
                                     online_resolution = "hd" if station.get("isHd") else "sd"
@@ -403,7 +404,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         :return: the channel title
         """
 
-        ret: Union[int, str] = channel_number
+        ret: int | str = channel_number
         channel_name: str = ""
 
         if channel_number == self._channel_current.get("number"):
@@ -507,7 +508,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         create_type: str,
         name: str,
         func,
-        when: Optional[Union[dt_util.dt.timedelta, dt_util.dt.datetime]] = None
+        when: Optional[dt_util.dt.timedelta | dt_util.dt.datetime] = None
     ):
         """Create an interval, listener or signal using the given details
 
