@@ -22,16 +22,7 @@ from homeassistant.components.media_player import (
     MediaPlayerEntity,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-
-# TODO: Fix up the try/except block if setting the minimum HASS version to 2021.12
-# MediaPlayerDeviceClass enum is introduced with HASS 2021.12
-try:
-    from homeassistant.components.media_player import MediaPlayerDeviceClass
-    DEVICE_CLASS_TV = None
-except ImportError:
-    MediaPlayerDeviceClass = None
-    from homeassistant.components.media_player import DEVICE_CLASS_TV
-
+from homeassistant.components.media_player import MediaPlayerDeviceClass
 from homeassistant.components.media_player.const import (
     MEDIA_CLASS_DIRECTORY,
     MEDIA_CLASS_URL,
@@ -1155,9 +1146,7 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
     def device_class(self) -> Optional[str]:
         """Device class of the entity"""
 
-        # TODO: Remove DEVICE_CLASS_TV if setting the minimum HASS version to 2021.12
-        # noinspection PyUnresolvedReferences
-        return DEVICE_CLASS_TV or MediaPlayerDeviceClass.TV
+        return MediaPlayerDeviceClass.TV
 
     @property
     def device_info(self) -> DeviceInfo:

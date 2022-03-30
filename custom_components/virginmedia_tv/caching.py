@@ -1,13 +1,6 @@
 """Manage caching"""
 
 # region #-- imports --#
-# TODO: Remove the try/except block when setting the minimum HASS version to 2021.12
-try:
-    from homeassistant.backports.enum import StrEnum
-except ImportError:
-    class StrEnum:
-        """"""
-
 import json
 import logging
 import os
@@ -17,6 +10,7 @@ from typing import (
     Optional,
 )
 
+from homeassistant.backports.enum import StrEnum
 from homeassistant.core import HomeAssistant
 
 from . import get_current_epoch
