@@ -63,7 +63,6 @@ from . import get_current_epoch
 
 from .caching import (
     VirginMediaCache,
-    VirginMediaCacheAuth,
     VirginMediaCacheChannels,
     VirginMediaCacheChannelMappings,
     VirginMediaCacheListings,
@@ -233,10 +232,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         if self._config.options.get(CONF_CHANNEL_FETCH_ENABLE, DEF_CHANNEL_FETCH_ENABLE):
             self._cache_details: Dict[str: VirginMediaCache] = {
-                "auth": VirginMediaCacheAuth(
-                    hass=hass,
-                    unique_id=self.unique_id,
-                ),
                 "channels": VirginMediaCacheChannels(
                     age=self._config.options.get(CONF_CHANNEL_INTERVAL, DEF_CHANNEL_INTERVAL),
                     hass=hass,
@@ -248,8 +243,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                     unique_id=self.unique_id,
                 ),
             }
-
-            self._cache_details["auth"].load()
 
     # region #-- private methods --#
     def _cache_cleanup(self, cleanup_type: str) -> None:
@@ -567,15 +560,10 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
 
         _LOGGER.debug(self._logger_message_format("entered"))
 
-        session_details = await self._cache_details.get("channels").fetch(
+        await self._cache_details.get("channels").fetch(
             username=self._config.options.get(CONF_CHANNEL_USER, ""),
             password=self._config.options.get(CONF_CHANNEL_PWD, ""),
-            cached_session=self._cache_details.get("auth").contents,
         )
-
-        # region #-- cache the session auth details --#
-        self._cache_details.get("auth").contents = session_details
-        # endregion
 
         _LOGGER.debug(self._logger_message_format("exited"))
 
@@ -601,7 +589,6 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
         await self._cache_details["listings"].fetch(
             username=self._config.options.get(CONF_CHANNEL_USER, ""),
             password=self._config.options.get(CONF_CHANNEL_PWD, ""),
-            cached_session=self._cache_details.get("auth").contents,
         )
 
         _LOGGER.debug(self._logger_message_format("exited"))
