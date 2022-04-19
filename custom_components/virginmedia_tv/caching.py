@@ -205,9 +205,9 @@ class VirginMediaCacheChannels(VirginMediaCache):
             cached_session = VirginMediaCacheAuth(hass=self._hass, unique_id=self.unique_id)
             async with API(username=username, password=password, existing_session=cached_session.load()) as channel_api:
                 channels = await channel_api.async_get_channels()
-                if channel_api.session_details != cached_session.contents:
-                    _LOGGER.debug(self._logger_message_format("API session details changed"))
-                    cached_session.contents = channel_api.session_details
+            if channel_api.session_details != cached_session.contents:
+                _LOGGER.debug(self._logger_message_format("API session details changed"))
+                cached_session.contents = channel_api.session_details
 
         except VirginMediaTVGuideError as err:
             _LOGGER.error("Invalid credentials used when attempting to cache the available channels")
@@ -299,8 +299,6 @@ class VirginMediaCacheListings(VirginMediaCache, ABC):
                     start_time=get_current_epoch(),
                     duration_hours=self._age,
                 )
-            _LOGGER.debug("listing_api.session_details: %s", listing_api.session_details)
-            _LOGGER.debug("cached_session: %s", cached_session)
             if listing_api.session_details != cached_session.contents:
                 _LOGGER.debug(self._logger_message_format("API session details changed"))
                 cached_session.contents = listing_api.session_details
