@@ -190,15 +190,11 @@ class VirginMediaCacheChannels(VirginMediaCache):
     _cache_type = VirginMediaCacheType.CHANNELS
     _leaf_path = DEF_CHANNEL_FILE
 
-    async def fetch(self, username: str, password: str, cached_session) -> Optional[dict]:
-        """Fetch the channels from the online service and cache locally
-
-        :return: The session details used for the connection
-        """
+    async def fetch(self, username: str, password: str) -> None:
+        """Fetch the channels from the online service and cache locally"""
 
         _LOGGER.debug(self._logger_message_format("entered, cache_type: %s"), self._cache_type)
 
-        ret = None
         flag_cache = VirginTvFlagFile(path=self._hass.config.path(DOMAIN, ".channels_caching"))
         if flag_cache.is_flagged():
             _LOGGER.debug(self._logger_message_format("exiting, already running"))
@@ -206,8 +202,13 @@ class VirginMediaCacheChannels(VirginMediaCache):
 
         flag_cache.create()
         try:
-            async with API(username=username, password=password, existing_session=cached_session) as channels_api:
-                channels = await channels_api.async_get_channels()
+            cached_session = VirginMediaCacheAuth(hass=self._hass, unique_id=self.unique_id)
+            async with API(username=username, password=password, existing_session=cached_session.load()) as channel_api:
+                channels = await channel_api.async_get_channels()
+                if channel_api.session_details != cached_session.contents:
+                    _LOGGER.debug(self._logger_message_format("API session details changed"))
+                    cached_session.contents = channel_api.session_details
+
         except VirginMediaTVGuideError as err:
             _LOGGER.error("Invalid credentials used when attempting to cache the available channels")
             _LOGGER.debug(self._logger_message_format("type: %s, message: %s", include_lineno=True), type(err), err)
@@ -216,12 +217,9 @@ class VirginMediaCacheChannels(VirginMediaCache):
         else:
             self._contents = channels
             self.dump()
-            ret = channels_api.session_details
         finally:
             flag_cache.delete()
             _LOGGER.debug(self._logger_message_format("exited, cache_type: %s"), self._cache_type)
-
-        return ret
 
 
 class VirginMediaCacheChannelMappings(VirginMediaCache, ABC):
@@ -281,7 +279,7 @@ class VirginMediaCacheListings(VirginMediaCache, ABC):
         self._station_id = station_id
         self._leaf_path = f"{self._station_id}.json"
 
-    async def fetch(self, username: str, password: str, cached_session) -> None:
+    async def fetch(self, username: str, password: str) -> None:
         """"""
 
         _LOGGER.debug(self._logger_message_format("entered, cache_type: %s"), self._cache_type)
@@ -294,12 +292,19 @@ class VirginMediaCacheListings(VirginMediaCache, ABC):
 
         flag_cache.create()
         try:
-            async with API(username=username, password=password, existing_session=cached_session) as listings_api:
-                listings = await listings_api.async_get_listing(
+            cached_session = VirginMediaCacheAuth(hass=self._hass, unique_id=self.unique_id)
+            async with API(username=username, password=password, existing_session=cached_session.load()) as listing_api:
+                listings = await listing_api.async_get_listing(
                     channel_id=self._station_id,
                     start_time=get_current_epoch(),
                     duration_hours=self._age,
                 )
+            _LOGGER.debug("listing_api.session_details: %s", listing_api.session_details)
+            _LOGGER.debug("cached_session: %s", cached_session)
+            if listing_api.session_details != cached_session.contents:
+                _LOGGER.debug(self._logger_message_format("API session details changed"))
+                cached_session.contents = listing_api.session_details
+
         except Exception as err:
             _LOGGER.error(self._logger_message_format("type: %s, message: %s", include_lineno=True), type(err), err)
         else:
