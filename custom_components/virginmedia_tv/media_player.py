@@ -718,6 +718,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                 self._ils_cancel(cancel_type="listener", name="current_program")
             if "listings_update" in self._listeners:
                 self._ils_cancel(cancel_type="listener", name="listings_update")
+            if "media_position" in self._intervals:
+                self._ils_cancel(cancel_type="interval", name="media_position")
             # endregion
 
             # region #-- set the extra attributes --#
