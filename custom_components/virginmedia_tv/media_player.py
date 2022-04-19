@@ -249,6 +249,8 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
                 ),
             }
 
+            self._cache_details["auth"].load()
+
     # region #-- private methods --#
     def _cache_cleanup(self, cleanup_type: str) -> None:
         """Cleanup the given cache type
