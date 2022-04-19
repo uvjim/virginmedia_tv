@@ -446,6 +446,9 @@ class VirginMediaPlayer(MediaPlayerEntity, VirginTvLogger, ABC):
             ]
 
         if current_program:
+            if "current_program" in self._listeners:  # cancel current program listener
+                self._ils_cancel(name="current_program", cancel_type="listener")
+
             self._channel_current["program"] = current_program[0]
             # region #-- set the program to update after this one finishes --#
             program_change_at = dt_util.dt.datetime.fromtimestamp(
