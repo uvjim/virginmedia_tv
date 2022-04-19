@@ -231,8 +231,8 @@ class API:
         The location previously retrieved is used to ensure the returned channels are
         those available for your region.
 
-        If the first attempt fails for a Forbidden reason we'll login again, the stored
-        session could have expired. I haven't worked out the reauth flow so we'll just
+        If the first attempt fails for a Forbidden reason we'll log in again, the stored
+        session could have expired. I haven't worked out the reauth flow, so we'll just
         do the whole login again.
 
         :return: an object containing all the channels as they were returned
@@ -344,7 +344,7 @@ class API:
     # region #-- properties --#
     @property
     def session_details(self) -> Optional[dict]:
-        """Return the important parts of the logged in session"""
+        """Return the important parts of the logged-in session"""
 
         ret = None
         if self._auth_session:
