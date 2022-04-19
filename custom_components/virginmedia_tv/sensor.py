@@ -56,6 +56,7 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
         self._attr_unique_id = f"{self._config.unique_id}::" \
                                f"{ENTITY_DOMAIN.lower()}::" \
                                f"{self.name}"
+        self._attr_should_poll = False
 
         self._state: str = self._config.data.get(CONF_SWVERSION, "")
 
