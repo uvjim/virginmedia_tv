@@ -1,3 +1,20 @@
+clear_cache:
+  name: Clear Cache
+  description: Clear the given cache type
+  fields:
+    cache_type:
+      name: Cache Type
+      description: The cache type that should be cleared
+      required: true
+      selector:
+        select:
+          options:
+            - label: Authentication
+              value: auth
+            - label: Channels
+              value: channels
+            - label: Channel Listings
+              value: listings
 send_ircode:
   name: Send IR Code
   description: Send the given IR code to the media player

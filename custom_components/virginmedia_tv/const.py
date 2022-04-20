@@ -20,6 +20,7 @@ CONF_HOST: str = "host"
 CONF_IDLE_TIMEOUT: str = "idle_timeout"
 CONF_PORT: str = "port"
 CONF_SCAN_INTERVAL: str = "scan_interval"
+CONF_SERVICES_HANDLER: str = "services_handler"
 CONF_SWVERSION: str = "swversion"
 CONF_TITLE_PLACEHOLDERS: str = "title_placeholders"
 CONF_ZNAME: str = "zname"
@@ -57,7 +58,6 @@ KNOWN_V6_REGIONS = {
     "Wales": "Wales",
 }
 
-SIGNAL_CLEAR_CACHE: str = f"{DOMAIN}_clear_cache"
 SIGNAL_SWVERSION: str = f"{DOMAIN}_swversion"
 
 STEP_CACHE_CONFIRM: str = "cache_confirm"

@@ -11,10 +11,16 @@ class VirginTvLogger:
     unique_id: str = ""
     _logger_prefix: str = ""
 
-    def _logger_message_format(self, msg: str, include_lineno: bool = False) -> str:
+    def __init__(self, unique_id: str = "", prefix: str = ""):
+        """Constructor"""
+
+        self._unique_id: str = unique_id
+        self._prefix: str = prefix
+
+    def message_format(self, msg: str, include_lineno: bool = False) -> str:
         """Format a log message in the correct format"""
 
         caller: inspect.FrameInfo = inspect.stack()[1]
         line_no = f" --> line: {caller.lineno}" if include_lineno else ""
-        unique_id = f" ({self.unique_id})" if self.unique_id else ""
-        return f"{self._logger_prefix}{caller.function}{unique_id}{line_no} --> {msg}"
+        unique_id = f" ({self._unique_id})" if self._unique_id else ""
+        return f"{self._prefix}{caller.function}{unique_id}{line_no} --> {msg}"
