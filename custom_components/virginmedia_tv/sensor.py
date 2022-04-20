@@ -64,12 +64,12 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
     def _update_callback(self, swversion: str) -> None:
         """Update method for the sensor"""
 
-        _LOGGER.debug(self._logger_message_format("entered, swversion: %s"), swversion)
-        _LOGGER.debug(self._logger_message_format("sensor is: %s"), "enabled" if self.enabled else "disabled")
+        _LOGGER.debug(self.message_format("entered, swversion: %s"), swversion)
+        _LOGGER.debug(self.message_format("sensor is: %s"), "enabled" if self.enabled else "disabled")
         if self.enabled:
             self._state = swversion
             asyncio.run_coroutine_threadsafe(coro=self.async_update_ha_state(), loop=self._hass.loop)
-        _LOGGER.debug(self._logger_message_format("exited"))
+        _LOGGER.debug(self.message_format("exited"))
     # endregion
 
     # region #-- initialise/cleanup methods --#
@@ -79,7 +79,7 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
         :return: None
         """
 
-        _LOGGER.debug(self._logger_message_format("entered"))
+        _LOGGER.debug(self.message_format("entered"))
         self.async_on_remove(
             async_dispatcher_connect(
                 hass=self.hass,
@@ -87,7 +87,7 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
                 target=self._update_callback,
             )
         )
-        _LOGGER.debug(self._logger_message_format("exited"))
+        _LOGGER.debug(self.message_format("exited"))
     # endregion
 
     # region #-- standard properties --#
