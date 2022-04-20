@@ -80,7 +80,7 @@ class VirginMediaCache:
 
         self._contents = None
 
-        files: List[str] = []
+        files: List[str]
         if "*" not in self.path:
             files = [self.path]
         else:
