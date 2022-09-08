@@ -13,7 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_SWVERSION, DOMAIN, SIGNAL_SWVERSION
-from .logger import VirginTvLogger
+from .logger import Logger
 
 # endregion
 
@@ -29,7 +29,7 @@ async def async_setup_entry(
     async_add_entities([TiVoSoftwareSensor(hass=hass, config_entry=config_entry)])
 
 
-class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
+class TiVoSoftwareSensor(SensorEntity):
     """Representation of software sensor."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -47,14 +47,15 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
         )
         self._attr_should_poll = False
 
+        self._log_formatter: Logger = Logger(unique_id=self._config.unique_id)
         self._state: str = self._config.data.get(CONF_SWVERSION, "")
 
     # region #-- private methods --#
     def _update_callback(self, swversion: str) -> None:
         """Update method for the sensor."""
-        _LOGGER.debug(self.message_format("entered, swversion: %s"), swversion)
+        _LOGGER.debug(self._log_formatter.format("entered, swversion: %s"), swversion)
         _LOGGER.debug(
-            self.message_format("sensor is: %s"),
+            self._log_formatter.format("sensor is: %s"),
             "enabled" if self.enabled else "disabled",
         )
         if self.enabled:
@@ -62,7 +63,7 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
             asyncio.run_coroutine_threadsafe(
                 coro=self.async_update_ha_state(), loop=self._hass.loop
             )
-        _LOGGER.debug(self.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
 
@@ -72,7 +73,7 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
 
         :return: None
         """
-        _LOGGER.debug(self.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         self.async_on_remove(
             async_dispatcher_connect(
                 hass=self.hass,
@@ -80,7 +81,7 @@ class TiVoSoftwareSensor(SensorEntity, VirginTvLogger):
                 target=self._update_callback,
             )
         )
-        _LOGGER.debug(self.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
 

@@ -80,7 +80,7 @@ from .const import (
     DEF_SCAN_INTERVAL,
     DOMAIN,
 )
-from .logger import VirginTvLogger
+from .logger import Logger
 from .pyvmtivo.client import Client
 from .pyvmtivo.exceptions import (
     VirginMediaCommandTimeout,
@@ -194,7 +194,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         self._listeners: Dict[str, Callable] = {}
         self._lock_client: asyncio.Lock = asyncio.Lock()
         self._lock_removing: asyncio.Lock = asyncio.Lock()
-        self._log_formatter = VirginTvLogger(unique_id=config_entry.unique_id)
+        self._log_formatter = Logger(unique_id=config_entry.unique_id)
         self._media_position: Optional[int] = None
         self._media_position_updated_at: Optional[dt_util.dt.datetime] = None
         self._signals: Dict[str, Callable] = {}
@@ -237,9 +237,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             self._config.options.get(CONF_DEVICE_PLATFORM, DEF_DEVICE_PLATFORM).lower()
             == "v6"
         ):
-            _LOGGER.debug(
-                self._log_formatter.message_format("processing V6 channel mappings")
-            )
+            _LOGGER.debug(self._log_formatter.format("processing V6 channel mappings"))
             # v6 devices don't merge resolutions onto the same channel number so use the mappings to build
             # the available channels
             self._channels_available = []
@@ -307,15 +305,11 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                 self._channels_available, key=lambda itm: itm["channelNumber"]
             )
             _LOGGER.debug(
-                self._log_formatter.message_format(
-                    "finished processing V6 channel mappings"
-                )
+                self._log_formatter.format("finished processing V6 channel mappings")
             )
         else:
             # assume all other devices can use the list as is from the online service
-            _LOGGER.debug(
-                self._log_formatter.message_format("loading tv 360 channnels")
-            )
+            _LOGGER.debug(self._log_formatter.format("loading tv 360 channnels"))
             self._channels_available = channel_cache.get("channels", [])
 
     def _channel_details(self, channel_number: int) -> dict:
@@ -412,7 +406,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
     def _current_program_set(self, _: Optional[dt_util.dt.datetime] = None) -> None:
         """Set the current program from the cached listings."""
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         current_epoch: int = int(dt_util.now().timestamp())
         current_program: List = []
 
@@ -437,7 +431,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                 (self._channel_current["program"].get("endTime") / 1000) + 1
             )
             _LOGGER.debug(
-                self._log_formatter.message_format("setting to change program at: %s"),
+                self._log_formatter.format("setting to change program at: %s"),
                 program_change_at,
             )
             self._ils_create(
@@ -451,7 +445,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             self._channel_current["program"] = None
 
         _LOGGER.debug(
-            self._log_formatter.message_format("current program is set: %s"),
+            self._log_formatter.format("current program is set: %s"),
             self._channel_current["program"] is not None,
         )
 
@@ -459,13 +453,11 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         asyncio.run_coroutine_threadsafe(
             coro=self.async_update_ha_state(), loop=self.hass.loop
         )
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     def _ils_cancel(self, name: str, cancel_type: str) -> None:
         """Cancel the given interval/listener/signal."""
-        _LOGGER.debug(
-            self._log_formatter.message_format("entered, %s: %s"), cancel_type, name
-        )
+        _LOGGER.debug(self._log_formatter.format("entered, %s: %s"), cancel_type, name)
 
         if cancel_type not in ("interval", "listener", "signal"):
             raise TypeError(f"Invalid type ({cancel_type})")
@@ -480,14 +472,14 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
         if name in unsubs:
             _LOGGER.debug(
-                self._log_formatter.message_format("cancelling %s: %s"),
+                self._log_formatter.format("cancelling %s: %s"),
                 cancel_type,
                 name,
             )
             unsubs[name]()
             unsubs.pop(name, None)
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     def _ils_create(
         self,
@@ -502,7 +494,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         `name` should be the signal to listen for if listening for a signal
         """
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, type: %s, name: %s, when: %s"),
+            self._log_formatter.format("entered, type: %s, name: %s, when: %s"),
             create_type,
             name,
             when,
@@ -528,11 +520,11 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                 )
         else:
             _LOGGER.debug(
-                self._log_formatter.message_format("locked not creating the %s"),
+                self._log_formatter.format("locked not creating the %s"),
                 create_type,
             )
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_cache_channel_mappings(
         self, _: Optional[dt_util.dt.datetime] = None
@@ -541,14 +533,14 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
         :return: None
         """
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
 
         await self._cache_details.get("channel_mappings").async_fetch()
         self._cache_process_available_channels(
             channel_cache=self._cache_details.get("channels").contents
         )
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_cache_channels(
         self, _: Optional[dt_util.dt.datetime] = None
@@ -557,14 +549,14 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
         :return: None
         """
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
 
         await self._cache_details.get("channels").async_fetch(
             username=self._config.options.get(CONF_CHANNEL_USER, ""),
             password=self._config.options.get(CONF_CHANNEL_PWD, ""),
         )
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_cache_listings(
         self, _: Optional[dt_util.dt.datetime] = None
@@ -573,12 +565,10 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
         :return: None
         """
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
 
         if not self._channel_current.get("station_id"):
-            _LOGGER.debug(
-                self._log_formatter.message_format("exited, no station_id set")
-            )
+            _LOGGER.debug(self._log_formatter.format("exited, no station_id set"))
             return
 
         self._cache_details["listings"] = VirginMediaCacheListings(
@@ -595,7 +585,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             password=self._config.options.get(CONF_CHANNEL_PWD, ""),
         )
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_fetch_player_state(
         self, _: Optional[dt_util.dt.datetime] = None
@@ -614,7 +604,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             ]
         ):
             _LOGGER.debug(
-                self._log_formatter.message_format("skipping due to current processing")
+                self._log_formatter.format("skipping due to current processing")
             )
             return
 
@@ -628,24 +618,22 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                             err, VirginMediaCommandTimeout
                         ) and not isinstance(err, VirginMediaConnectionReset):
                             _LOGGER.warning(
-                                self._log_formatter.message_format(
+                                self._log_formatter.format(
                                     "type: %s, message: %s", include_lineno=True
                                 ),
                                 type(err),
                                 err,
                             )
                             _LOGGER.debug(
-                                self._log_formatter.message_format(
-                                    "device.channel_number: %s"
-                                ),
+                                self._log_formatter.format("device.channel_number: %s"),
                                 self._client.device.channel_number,
                             )
             except VirginMediaCommandTimeout:
-                _LOGGER.debug(self._log_formatter.message_format("unable to connect"))
+                _LOGGER.debug(self._log_formatter.format("unable to connect"))
                 return
             except VirginMediaError as err:
                 _LOGGER.warning(
-                    self._log_formatter.message_format(
+                    self._log_formatter.format(
                         "type: %s, message: %s", include_lineno=True
                     ),
                     type(err),
@@ -662,7 +650,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
             if self._client.device.channel_number != self.media_channel:
                 _LOGGER.debug(
-                    self._log_formatter.message_format("channel changed from %s to %s"),
+                    self._log_formatter.format("channel changed from %s to %s"),
                     self._channel_current["number"],
                     self._client.device.channel_number,
                 )
@@ -689,7 +677,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
                     if not self._channel_current.get("station_id"):
                         _LOGGER.warning(
-                            self._log_formatter.message_format(
+                            self._log_formatter.format(
                                 "unable to retrieve station id for %d"
                             ),
                             self._channel_current["number"],
@@ -697,7 +685,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                     else:
                         # region #-- load the listings cache --#
                         _LOGGER.debug(
-                            self._log_formatter.message_format("station id for %d: %s"),
+                            self._log_formatter.format("station id for %d: %s"),
                             self._channel_current["number"],
                             self._channel_current["station_id"],
                         )
@@ -764,16 +752,14 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
                         def _idle_to_off(_: Optional[dt_util.dt.datetime] = None):
                             """Switch the player to off if idle after a period of time."""
-                            _LOGGER.debug(self._log_formatter.message_format("entered"))
+                            _LOGGER.debug(self._log_formatter.format("entered"))
                             _LOGGER.debug(
-                                self._log_formatter.message_format("current state: %s"),
+                                self._log_formatter.format("current state: %s"),
                                 self._state,
                             )
                             if self._state == STATE_IDLE:
                                 _LOGGER.debug(
-                                    self._log_formatter.message_format(
-                                        "setting state to off"
-                                    )
+                                    self._log_formatter.format("setting state to off")
                                 )
                                 self._state = STATE_OFF
                                 asyncio.run_coroutine_threadsafe(
@@ -784,7 +770,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                                 self._ils_cancel(
                                     cancel_type="listener", name="idle_to_off"
                                 )
-                            _LOGGER.debug(self._log_formatter.message_format("exited"))
+                            _LOGGER.debug(self._log_formatter.format("exited"))
 
                         if "idle_to_off" not in self._listeners:
                             num_hours = self._config.options.get(
@@ -794,7 +780,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                                 hours=num_hours
                             )
                             _LOGGER.debug(
-                                self._log_formatter.message_format(
+                                self._log_formatter.format(
                                     "switching from idle to off at: %s"
                                 ),
                                 fire_at,
@@ -818,7 +804,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
     ) -> None:
         """Send an ircode to the device."""
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, code: %s, from_service: %s"),
+            self._log_formatter.format("entered, code: %s, from_service: %s"),
             code,
             from_service,
         )
@@ -827,7 +813,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             func_action = self._key_to_action.get(code.lower(), None)
             if func_action is not None:
                 _LOGGER.debug(
-                    self._log_formatter.message_format(
+                    self._log_formatter.format(
                         "received action key, deferring to action method"
                     )
                 )
@@ -842,7 +828,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                         )
                     except Exception as err:
                         _LOGGER.debug(
-                            self._log_formatter.message_format(
+                            self._log_formatter.format(
                                 "type: %s, message: %s", include_lineno=True
                             ),
                             type(err),
@@ -852,14 +838,14 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                             err, VirginMediaCommandTimeout
                         ) and not self._flags.get(_FLAG_TURNING_ON):
                             raise err from None
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_send_keycode(
         self, code: str, from_service: bool = False, **_
     ) -> None:
         """Send a keycode to the device."""
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, code: %s, from_service: %s"),
+            self._log_formatter.format("entered, code: %s, from_service: %s"),
             code,
             from_service,
         )
@@ -868,7 +854,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             func_action = self._key_to_action.get(code.lower(), None)
             if func_action is not None:
                 _LOGGER.debug(
-                    self._log_formatter.message_format(
+                    self._log_formatter.format(
                         "received action key, deferring to action method"
                     )
                 )
@@ -883,14 +869,14 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                         )
                     except Exception as err:
                         _LOGGER.warning(
-                            self._log_formatter.message_format(
+                            self._log_formatter.format(
                                 "type: %s, message: %s", include_lineno=True
                             ),
                             type(err),
                             err,
                         )
                         raise err from None
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_service_update_channels(self, **_) -> None:
         """Force caching of the channel details and mappings.
@@ -926,7 +912,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
         :return: None
         """
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
 
         # region #-- setup the channel numbers and listings if needed --#
         if self._config.options.get(
@@ -941,7 +927,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
                 :return: None
                 """
-                _LOGGER.debug(self._log_formatter.message_format("entered"))
+                _LOGGER.debug(self._log_formatter.format("entered"))
                 await self._async_cache_channels()
                 self._ils_create(
                     create_type="interval",
@@ -954,7 +940,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                     ),
                 )
                 self._ils_cancel(name="channels_init_cache", cancel_type="listener")
-                _LOGGER.debug(self._log_formatter.message_format("exited"))
+                _LOGGER.debug(self._log_formatter.format("exited"))
 
             if not self._cache_details.get(
                 "channels"
@@ -969,12 +955,12 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                     when=cache_again_at,
                 )
                 _LOGGER.debug(
-                    self._log_formatter.message_format("channels will re-cache at: %s"),
+                    self._log_formatter.format("channels will re-cache at: %s"),
                     cache_again_at,
                 )
             else:
                 await _async_cache_channels_start()
-            _LOGGER.debug(self._log_formatter.message_format("channels loaded"))
+            _LOGGER.debug(self._log_formatter.format("channels loaded"))
             # endregion
 
             # region #-- set up the channel mappings cache --#
@@ -992,7 +978,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
                     :return: None
                     """
-                    _LOGGER.debug(self._log_formatter.message_format("entered"))
+                    _LOGGER.debug(self._log_formatter.format("entered"))
                     await self._async_cache_channel_mappings()
                     self._ils_create(
                         create_type="interval",
@@ -1007,7 +993,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                     self._ils_cancel(
                         name="channel_mappings_init_cache", cancel_type="listener"
                     )
-                    _LOGGER.debug(self._log_formatter.message_format("exited"))
+                    _LOGGER.debug(self._log_formatter.format("exited"))
 
                 if not self._cache_details.get(
                     "channel_mappings"
@@ -1026,16 +1012,14 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                         when=cache_again_at,
                     )
                     _LOGGER.debug(
-                        self._log_formatter.message_format(
+                        self._log_formatter.format(
                             "channel mappings will re-cache at: %s"
                         ),
                         cache_again_at,
                     )
                 else:
                     await _async_cache_channel_mappings_start()
-                _LOGGER.debug(
-                    self._log_formatter.message_format("channel mappings loaded")
-                )
+                _LOGGER.debug(self._log_formatter.format("channel mappings loaded"))
             # endregion
         # endregion
 
@@ -1055,19 +1039,19 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         )
         # endregion
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_will_remove_from_hass(self) -> None:
         """Cleanup when removing from HASS.
 
         :return: None
         """
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
 
         async with self._lock_removing:
             # region #-- stop the timers --#
             _LOGGER.debug(
-                self._log_formatter.message_format("%d intervals to stop"),
+                self._log_formatter.format("%d intervals to stop"),
                 len(self._intervals),
             )
             interval_names = list(self._intervals.keys())
@@ -1077,7 +1061,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
             # region #-- cancel the listeners --#
             _LOGGER.debug(
-                self._log_formatter.message_format("%d listeners to cancel"),
+                self._log_formatter.format("%d listeners to cancel"),
                 len(self._listeners),
             )
             listener_names = list(self._listeners.keys())
@@ -1087,7 +1071,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
             # region #-- stop the listening for the signals --#
             _LOGGER.debug(
-                self._log_formatter.message_format("%d signals to stop listening for"),
+                self._log_formatter.format("%d signals to stop listening for"),
                 len(self._signals),
             )
             signal_names = list(self._signals.keys())
@@ -1095,7 +1079,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                 self._ils_cancel(name=signal_name, cancel_type="signal")
             # endregion
 
-            _LOGGER.debug(self._log_formatter.message_format("exited"))
+            _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
 
@@ -1133,7 +1117,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
     async def async_media_pause(self) -> None:
         """Pause the currently playing media."""
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
             await self._async_send_keycode(code="pause")
         except Exception:
@@ -1144,11 +1128,11 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             elif self._state == STATE_PAUSED:
                 self._state = STATE_PLAYING
             await self.async_update_ha_state()
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_media_play(self) -> None:
         """Play the media."""
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
             await self._async_send_keycode(code="play")
         except Exception:
@@ -1157,11 +1141,11 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             if self._state not in (STATE_OFF, STATE_IDLE):
                 self._state = STATE_PLAYING
             await self.async_update_ha_state()
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_media_stop(self) -> None:
         """Stop the media."""
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
             await self._async_send_keycode(code="stop")
         except Exception:
@@ -1170,12 +1154,12 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             if self._state == STATE_PAUSED:
                 self._state = STATE_PLAYING
             await self.async_update_ha_state()
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_play_media(self, media_type, media_id, **kwargs) -> None:
         """Play the given media."""
         _LOGGER.debug(
-            self._log_formatter.message_format(
+            self._log_formatter.format(
                 "entered, media_type: %s, media_id: %s, kwargs: %s"
             ),
             media_type,
@@ -1186,27 +1170,25 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             await self.async_select_source(source=media_id)
         else:
             _LOGGER.debug(
-                self._log_formatter.message_format("invalid media type (%s)"),
+                self._log_formatter.format("invalid media type (%s)"),
                 media_type,
             )
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_select_source(self, source) -> None:
         """Change the source of the media player."""
-        _LOGGER.debug(self._log_formatter.message_format("entered, source: %s"), source)
+        _LOGGER.debug(self._log_formatter.format("entered, source: %s"), source)
 
         if self._state == STATE_OFF:
             await self.async_turn_on()
 
         channel_number = source.split(_CHANNEL_SEPARATOR)[0]
         _LOGGER.debug(
-            self._log_formatter.message_format("changing source to: %s"), channel_number
+            self._log_formatter.format("changing source to: %s"), channel_number
         )
         async with self._lock_client:
             async with self._client:
-                _LOGGER.debug(
-                    self._log_formatter.message_format("issuing channel change")
-                )
+                _LOGGER.debug(self._log_formatter.format("issuing channel change"))
                 try:
                     if self._config.options.get(
                         CONF_DEVICE_USE_SETCH, DEF_DEVICE_USE_SETCH
@@ -1220,21 +1202,19 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                                 f"NUM{number}", wait_for_reply=False
                             )
                 except VirginMediaInvalidChannel as err:
-                    _LOGGER.warning(self._log_formatter.message_format("%s"), err)
+                    _LOGGER.warning(self._log_formatter.format("%s"), err)
                 except Exception as err:
-                    _LOGGER.debug(self._log_formatter.message_format("%s"), err)
+                    _LOGGER.debug(self._log_formatter.format("%s"), err)
                     raise err from None
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_turn_off(self) -> None:
         """Turn the media player off."""
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         self._flags[_FLAG_TURNING_OFF] = True
         if self._state not in (STATE_OFF, STATE_IDLE):
-            _LOGGER.debug(
-                self._log_formatter.message_format("issuing turn off request")
-            )
+            _LOGGER.debug(self._log_formatter.format("issuing turn off request"))
             try:
                 await self._async_send_ircode(code="standby")
                 await self._async_send_ircode(code="standby")
@@ -1245,15 +1225,15 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                 await self.async_update_ha_state()
         else:
             _LOGGER.warning(
-                self._log_formatter.message_format("invalid state for turning off: %s"),
+                self._log_formatter.format("invalid state for turning off: %s"),
                 self._state,
             )
         self._flags[_FLAG_TURNING_OFF] = False
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_turn_on(self) -> None:
         """Turn the media player on."""
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         self._flags[_FLAG_TURNING_ON] = True
         if self._state in (STATE_IDLE, STATE_OFF):
             try:
@@ -1263,7 +1243,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             else:
                 if not self._client.device.channel_number:
                     _LOGGER.debug(
-                        self._log_formatter.message_format(
+                        self._log_formatter.format(
                             "waiting for device to be ready for commands"
                         )
                     )
@@ -1274,11 +1254,11 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                 await self.async_update_ha_state()
         else:
             _LOGGER.warning(
-                self._log_formatter.message_format("invalid state for turning on: %s"),
+                self._log_formatter.format("invalid state for turning on: %s"),
                 self._state,
             )
         self._flags[_FLAG_TURNING_ON] = False
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
 

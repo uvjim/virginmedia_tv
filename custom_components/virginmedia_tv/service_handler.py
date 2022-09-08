@@ -13,7 +13,7 @@ from .caching import (
     VirginMediaCacheListings,
 )
 from .const import DOMAIN
-from .logger import VirginTvLogger
+from .logger import Logger
 
 # endregion
 
@@ -39,7 +39,7 @@ class VirginMediaServiceHandler:
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialise."""
         self._hass: HomeAssistant = hass
-        self._log_formatter: VirginTvLogger = VirginTvLogger()
+        self._log_formatter: Logger = Logger()
 
     async def _async_service_call(self, call: ServiceCall) -> None:
         """Call the required method based on the given argument.
@@ -47,7 +47,7 @@ class VirginMediaServiceHandler:
         :param call: the service call that should be made
         :return: None
         """
-        _LOGGER.debug(self._log_formatter.message_format("entered, call: %s"), call)
+        _LOGGER.debug(self._log_formatter.format("entered, call: %s"), call)
 
         args = call.data.copy()
         method = getattr(self, call.service, None)
@@ -55,9 +55,9 @@ class VirginMediaServiceHandler:
             try:
                 await method(**args)
             except Exception as err:
-                _LOGGER.warning(self._log_formatter.message_format("%s"), err)
+                _LOGGER.warning(self._log_formatter.format("%s"), err)
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     def register_services(self) -> None:
         """Register the services."""
@@ -76,7 +76,7 @@ class VirginMediaServiceHandler:
 
     async def clear_cache(self, **kwargs) -> None:
         """Clear the given cache."""
-        _LOGGER.debug(self._log_formatter.message_format("entered, kwargs: %s"), kwargs)
+        _LOGGER.debug(self._log_formatter.format("entered, kwargs: %s"), kwargs)
 
         if kwargs.get("cache_type") == "auth":
             VirginMediaCacheAuth(hass=self._hass, unique_id="").clear()
@@ -88,4 +88,4 @@ class VirginMediaServiceHandler:
                 hass=self._hass, station_id="lgi-*", unique_id=""
             ).clear()
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))

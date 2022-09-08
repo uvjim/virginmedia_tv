@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DEF_AUTH_FILE, DEF_CHANNEL_FILE, DEF_CHANNEL_MAPPINGS_FILE, DOMAIN
 from .flagging import VirginTvFlagFile
-from .logger import VirginTvLogger
+from .logger import Logger
 from .pyvmtvguide.api import API, TVChannelLists
 from .pyvmtvguide.exceptions import VirginMediaTVGuideError
 
@@ -52,23 +52,23 @@ class VirginMediaCache:
         self._age: int = age
         self._contents: Any = None
         self._hass: HomeAssistant = hass
-        self._log_formatter = VirginTvLogger(unique_id=unique_id)
+        self._log_formatter = Logger(unique_id=unique_id)
 
         self.unique_id = unique_id
 
     def _is_loaded(self) -> bool:
         """Check if the cache has been loaded."""
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, cache_type: %s"),
+            self._log_formatter.format("entered, cache_type: %s"),
             self._cache_type,
         )
         ret = self.contents is not None
-        _LOGGER.debug(self._log_formatter.message_format("exited, %s"), ret)
+        _LOGGER.debug(self._log_formatter.format("exited, %s"), ret)
         return ret
 
     def clear(self) -> None:
         """Clear the cache in memory and on disk."""
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
 
         self._contents = None
 
@@ -80,9 +80,7 @@ class VirginMediaCache:
 
         for cache_file in files:
             if os.path.exists(cache_file):
-                _LOGGER.debug(
-                    self._log_formatter.message_format("removing: %s"), cache_file
-                )
+                _LOGGER.debug(self._log_formatter.format("removing: %s"), cache_file)
                 os.remove(cache_file)
                 # check if the directory needs removing
                 # doing this each go round just in case the list has multiple different locations
@@ -90,17 +88,17 @@ class VirginMediaCache:
                 num_files_left = len([True for _ in list(os.scandir(dir_path))])
                 if num_files_left == 0:
                     _LOGGER.debug(
-                        self._log_formatter.message_format("%s is empty, removing it"),
+                        self._log_formatter.format("%s is empty, removing it"),
                         dir_path,
                     )
                     os.rmdir(dir_path)
 
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     def dump(self) -> None:
         """Dump the contents of the cache to a file."""
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, cache_type: %s"),
+            self._log_formatter.format("entered, cache_type: %s"),
             self._cache_type,
         )
 
@@ -109,7 +107,7 @@ class VirginMediaCache:
             json.dump(self._contents, cache_file, indent=2)
 
         _LOGGER.debug(
-            self._log_formatter.message_format("exited, cache_type: %s"),
+            self._log_formatter.format("exited, cache_type: %s"),
             self._cache_type,
         )
 
@@ -120,39 +118,35 @@ class VirginMediaCache:
     def load(self) -> Any:
         """Load the contents of the cache into memory."""
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, cache_type: %s"),
+            self._log_formatter.format("entered, cache_type: %s"),
             self._cache_type,
         )
 
         if self.path:
             if os.path.exists(self.path):
                 _LOGGER.debug(
-                    self._log_formatter.message_format("loading cache from %s"),
+                    self._log_formatter.format("loading cache from %s"),
                     self.path,
                 )
                 with open(self.path, "r", encoding="utf8") as cache_file:
                     try:
                         self._contents = json.load(cache_file)
                         _LOGGER.debug(
-                            self._log_formatter.message_format("cache loaded (%s)"),
+                            self._log_formatter.format("cache loaded (%s)"),
                             self.path,
                         )
                     except json.JSONDecodeError:
                         _LOGGER.error(
-                            self._log_formatter.message_format("invalid JSON (%s)"),
+                            self._log_formatter.format("invalid JSON (%s)"),
                             self.path,
                         )
             else:
-                _LOGGER.debug(
-                    self._log_formatter.message_format("cache file does not exist")
-                )
+                _LOGGER.debug(self._log_formatter.format("cache file does not exist"))
         else:
-            _LOGGER.debug(
-                self._log_formatter.message_format("unable to establish cache file")
-            )
+            _LOGGER.debug(self._log_formatter.format("unable to establish cache file"))
 
         _LOGGER.debug(
-            self._log_formatter.message_format("exited, cache_type: %s"),
+            self._log_formatter.format("exited, cache_type: %s"),
             self._cache_type,
         )
 
@@ -178,7 +172,7 @@ class VirginMediaCache:
         :return: True if an update is required, False otherwise
         """
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, cache_type: %s"),
+            self._log_formatter.format("entered, cache_type: %s"),
             self._cache_type,
         )
 
@@ -187,31 +181,29 @@ class VirginMediaCache:
 
         if not self._is_loaded():
             _LOGGER.debug(
-                self._log_formatter.message_format("exited, cache_type: %s"),
+                self._log_formatter.format("exited, cache_type: %s"),
                 self._cache_type,
             )
             return True
 
         _LOGGER.debug(
-            self._log_formatter.message_format("last updated at: %d"), self.last_updated
+            self._log_formatter.format("last updated at: %d"), self.last_updated
         )
 
         current_epoch: int = int(dt_util.now().timestamp())
-        _LOGGER.debug(self._log_formatter.message_format("current: %d"), current_epoch)
+        _LOGGER.debug(self._log_formatter.format("current: %d"), current_epoch)
         _LOGGER.debug(
-            self._log_formatter.message_format("needs updating at: %d"), self.expires_at
+            self._log_formatter.format("needs updating at: %d"), self.expires_at
         )
 
         if self.expires_at < current_epoch:
             _LOGGER.debug(
-                self._log_formatter.message_format("cache stale by %d seconds"),
+                self._log_formatter.format("cache stale by %d seconds"),
                 current_epoch - self.expires_at,
             )
             return True
         else:
-            _LOGGER.debug(
-                self._log_formatter.message_format("exited --> no update required")
-            )
+            _LOGGER.debug(self._log_formatter.format("exited --> no update required"))
             return False
 
     @property
@@ -252,7 +244,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
     async def async_fetch(self, username: str, password: str) -> None:
         """Fetch the channels from the online service and cache locally."""
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, cache_type: %s"),
+            self._log_formatter.format("entered, cache_type: %s"),
             self._cache_type,
         )
 
@@ -260,9 +252,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
             path=self._hass.config.path(DOMAIN, ".channels_caching")
         )
         if flag_cache.is_flagged():
-            _LOGGER.debug(
-                self._log_formatter.message_format("exiting, already running")
-            )
+            _LOGGER.debug(self._log_formatter.format("exiting, already running"))
             return
 
         flag_cache.create()
@@ -277,9 +267,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
             ) as channel_api:
                 channels = await channel_api.async_get_channels()
             if channel_api.session_details != cached_session.contents:
-                _LOGGER.debug(
-                    self._log_formatter.message_format("API session details changed")
-                )
+                _LOGGER.debug(self._log_formatter.format("API session details changed"))
                 cached_session.contents = channel_api.session_details
 
         except VirginMediaTVGuideError as err:
@@ -287,7 +275,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
                 "Invalid credentials used when attempting to cache the available channels"
             )
             _LOGGER.debug(
-                self._log_formatter.message_format(
+                self._log_formatter.format(
                     "type: %s, message: %s", include_lineno=True
                 ),
                 type(err),
@@ -295,7 +283,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
             )
         except Exception as err:
             _LOGGER.error(
-                self._log_formatter.message_format(
+                self._log_formatter.format(
                     "type: %s, message: %s", include_lineno=True
                 ),
                 type(err),
@@ -307,7 +295,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
         finally:
             flag_cache.delete()
             _LOGGER.debug(
-                self._log_formatter.message_format("exited, cache_type: %s"),
+                self._log_formatter.format("exited, cache_type: %s"),
                 self._cache_type,
             )
 
@@ -321,7 +309,7 @@ class VirginMediaCacheChannelMappings(VirginMediaCache, ABC):
     async def async_fetch(self) -> None:
         """Retrieve the channel mappings from the online service."""
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, cache_type: %s"),
+            self._log_formatter.format("entered, cache_type: %s"),
             self._cache_type,
         )
 
@@ -329,9 +317,7 @@ class VirginMediaCacheChannelMappings(VirginMediaCache, ABC):
             path=self._hass.config.path(DOMAIN, ".channel_mappings_caching")
         )
         if flag_cache.is_flagged():
-            _LOGGER.debug(
-                self._log_formatter.message_format("exiting, already running")
-            )
+            _LOGGER.debug(self._log_formatter.format("exiting, already running"))
             return
 
         flag_cache.create()
@@ -341,7 +327,7 @@ class VirginMediaCacheChannelMappings(VirginMediaCache, ABC):
                 await tvc.async_fetch()
         except Exception as err:
             _LOGGER.error(
-                self._log_formatter.message_format(
+                self._log_formatter.format(
                     "type: %s, message: %s", include_lineno=True
                 ),
                 type(err),
@@ -354,7 +340,7 @@ class VirginMediaCacheChannelMappings(VirginMediaCache, ABC):
             flag_cache.delete()
 
         _LOGGER.debug(
-            self._log_formatter.message_format("exited, cache_type: %s"),
+            self._log_formatter.format("exited, cache_type: %s"),
             self._cache_type,
         )
 
@@ -391,20 +377,16 @@ class VirginMediaCacheListings(VirginMediaCache, ABC):
     async def async_fetch(self, username: str, password: str) -> None:
         """Retrieve the listings from the API."""
         _LOGGER.debug(
-            self._log_formatter.message_format("entered, cache_type: %s"),
+            self._log_formatter.format("entered, cache_type: %s"),
             self._cache_type,
         )
-        _LOGGER.debug(
-            self._log_formatter.message_format("station id: %s"), self._station_id
-        )
+        _LOGGER.debug(self._log_formatter.format("station id: %s"), self._station_id)
 
         flag_cache = VirginTvFlagFile(
             path=self._hass.config.path(DOMAIN, f".{self._station_id}_caching")
         )
         if flag_cache.is_flagged():
-            _LOGGER.debug(
-                self._log_formatter.message_format("exiting, already running")
-            )
+            _LOGGER.debug(self._log_formatter.format("exiting, already running"))
             return
 
         flag_cache.create()
@@ -423,14 +405,12 @@ class VirginMediaCacheListings(VirginMediaCache, ABC):
                     duration_hours=self._age,
                 )
             if listing_api.session_details != cached_session.contents:
-                _LOGGER.debug(
-                    self._log_formatter.message_format("API session details changed")
-                )
+                _LOGGER.debug(self._log_formatter.format("API session details changed"))
                 cached_session.contents = listing_api.session_details
 
         except Exception as err:
             _LOGGER.error(
-                self._log_formatter.message_format(
+                self._log_formatter.format(
                     "type: %s, message: %s", include_lineno=True
                 ),
                 type(err),
@@ -442,7 +422,7 @@ class VirginMediaCacheListings(VirginMediaCache, ABC):
         finally:
             flag_cache.delete()
             _LOGGER.debug(
-                self._log_formatter.message_format("exited, cache_type: %s"),
+                self._log_formatter.format("exited, cache_type: %s"),
                 self._cache_type,
             )
 

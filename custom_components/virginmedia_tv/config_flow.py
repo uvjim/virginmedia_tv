@@ -63,7 +63,7 @@ from .const import (
     STEP_V6_REGION,
     STEP_VIRGIN_CREDS,
 )
-from .logger import VirginTvLogger
+from .logger import Logger
 from .pyvmtvguide.api import API as VirginMediaAPI
 from .pyvmtvguide.exceptions import VirginMediaTVGuideError
 
@@ -257,7 +257,7 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialise."""
         self._data: dict = {}
         self._errors: dict = {}
-        self._log_formatter = VirginTvLogger()
+        self._log_formatter = Logger()
         self._options: dict = {}
 
     @staticmethod
@@ -274,15 +274,13 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
         :param user_input: credentials for login
         :return: None
         """
-        _LOGGER.debug(
-            self._log_formatter.message_format("entered, user_input: %s"), user_input
-        )
+        _LOGGER.debug(self._log_formatter.format("entered, user_input: %s"), user_input)
         async with VirginMediaAPI(**user_input) as vm_api:
             try:
                 await vm_api.async_login()
             except VirginMediaTVGuideError as err:
                 _LOGGER.debug(
-                    self._log_formatter.message_format(
+                    self._log_formatter.format(
                         "type: %s, message: %s", include_lineno=True
                     ),
                     type(err),
@@ -293,20 +291,20 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self.hass.async_create_task(
             self.hass.config_entries.flow.async_configure(flow_id=self.flow_id)
         )
-        _LOGGER.debug(self._log_formatter.message_format("exited"))
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_step_finish(self) -> data_entry_flow.FlowResult:
         """Create the configuration entry.
 
         Should always be the last step in the flow
         """
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         title = (
             self.context.get(CONF_TITLE_PLACEHOLDERS, {}).get(CONF_FLOW_NAME)
             or DEF_FLOW_NAME
         )
         _LOGGER.debug(
-            self._log_formatter.message_format(
+            self._log_formatter.format(
                 "creating entry --> title: %s; data: %s; options: %s"
             ),
             title,
@@ -323,11 +321,9 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
         :param user_input: details entered by the user
         :return: the necessary FlowResult
         """
-        _LOGGER.debug(
-            self._log_formatter.message_format("entered, user_input: %s"), user_input
-        )
+        _LOGGER.debug(self._log_formatter.format("entered, user_input: %s"), user_input)
         if not self.task_login:
-            _LOGGER.debug(self._log_formatter.message_format("creating login task"))
+            _LOGGER.debug(self._log_formatter.format("creating login task"))
             details: dict = {
                 "username": self._options.get(CONF_CHANNEL_USER),
                 "password": self._options.get(CONF_CHANNEL_PWD),
@@ -340,16 +336,14 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         try:
-            _LOGGER.debug(self._log_formatter.message_format("running login task"))
+            _LOGGER.debug(self._log_formatter.format("running login task"))
             await self.task_login
-            _LOGGER.debug(
-                self._log_formatter.message_format("returned from login task")
-            )
+            _LOGGER.debug(self._log_formatter.format("returned from login task"))
         except Exception as err:
-            _LOGGER.debug(self._log_formatter.message_format("exception: %s"), err)
+            _LOGGER.debug(self._log_formatter.format("exception: %s"), err)
             return self.async_abort(reason="abort_login")
 
-        _LOGGER.debug(self._log_formatter.message_format("_errors: %s"), self._errors)
+        _LOGGER.debug(self._log_formatter.format("_errors: %s"), self._errors)
         if self._errors:
             return self.async_show_progress_done(next_step_id=STEP_VIRGIN_CREDS)
 
@@ -357,7 +351,7 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_options(self, user_input=None) -> data_entry_flow.FlowResult:
         """Display generic options for the integration."""
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             self._options.update(user_input)
             # region #-- where to next? --#
@@ -379,7 +373,7 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_timeouts(self, user_input=None) -> data_entry_flow.FlowResult:
         """Prompt for configurable timeouts."""
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             self._options[CONF_CONNECT_TIMEOUT] = DEF_CONNECT_TIMEOUT
             self._options[CONF_COMMAND_TIMEOUT] = DEF_COMMAND_TIMEOUT
@@ -403,20 +397,18 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         Should only end up here if not configuring from a discovered device
         """
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             # region #-- check if the tivo already exists --#
             _LOGGER.debug(
-                self._log_formatter.message_format("Checking if TiVo exists by address")
+                self._log_formatter.format("Checking if TiVo exists by address")
             )
             tivo = _is_existing_configured_tivo(
                 hass=self.hass, address=user_input.get(CONF_HOST)
             )
             if tivo:
                 _LOGGER.debug(
-                    self._log_formatter.message_format(
-                        "found existing TiVo with address %s"
-                    ),
+                    self._log_formatter.format("found existing TiVo with address %s"),
                     user_input.get(CONF_HOST),
                 )
                 return self.async_abort(reason="already_configured")
@@ -438,7 +430,7 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None) -> data_entry_flow.FlowResult:
         """Entry point for the flow."""
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
 
         return await self.async_step_tivo()
 
@@ -446,7 +438,7 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input=None
     ) -> data_entry_flow.FlowResult:
         """Get the Virgin Media credentials."""
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             self.task_login = None
             self._errors = {}
@@ -466,9 +458,7 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self, discovery_info: ZeroconfServiceInfo
     ) -> data_entry_flow.FlowResult:
         """Entry point for an automatically discovered device."""
-        _LOGGER.debug(
-            self._log_formatter.message_format("discovery_info: %s"), discovery_info
-        )
+        _LOGGER.debug(self._log_formatter.format("discovery_info: %s"), discovery_info)
 
         if not _is_valid_tivo(discovery_info):
             self.async_abort(reason="incomplete_tivo")
@@ -488,39 +478,29 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         # region #-- set the unique_id --#
         if serial:
-            _LOGGER.debug(self._log_formatter.message_format("unique_id: %s"), serial)
+            _LOGGER.debug(self._log_formatter.format("unique_id: %s"), serial)
             await self.async_set_unique_id(serial)
-            _LOGGER.debug(
-                self._log_formatter.message_format("dispatching swversion message")
-            )
+            _LOGGER.debug(self._log_formatter.format("dispatching swversion message"))
             async_dispatcher_send(self.hass, SIGNAL_SWVERSION, swversion)
-            _LOGGER.debug(
-                self._log_formatter.message_format("aborting if already configured")
-            )
+            _LOGGER.debug(self._log_formatter.format("aborting if already configured"))
             self._abort_if_unique_id_configured()
         # endregion
 
         # region #-- check if the TiVo has already been manually configured --#
-        _LOGGER.debug(
-            self._log_formatter.message_format("checking if TiVo exists by address")
-        )
+        _LOGGER.debug(self._log_formatter.format("checking if TiVo exists by address"))
         tivo = _is_existing_configured_tivo(hass=self.hass, address=host)
         if tivo:
             _LOGGER.debug(
-                self._log_formatter.message_format(
-                    "found existing TiVo with address %s"
-                ),
+                self._log_formatter.format("found existing TiVo with address %s"),
                 host,
             )
-            _LOGGER.debug(self._log_formatter.message_format("updating"))
+            _LOGGER.debug(self._log_formatter.format("updating"))
             self.hass.config_entries.async_update_entry(entry=tivo, unique_id=serial)
-            _LOGGER.debug(
-                self._log_formatter.message_format("dispatching swversion message")
-            )
+            _LOGGER.debug(self._log_formatter.format("dispatching swversion message"))
             async_dispatcher_send(self.hass, SIGNAL_SWVERSION, swversion)
             return self.async_abort(reason="already_configured")
 
-        _LOGGER.debug(self._log_formatter.message_format("no existing TiVo found"))
+        _LOGGER.debug(self._log_formatter.format("no existing TiVo found"))
         # endregion
 
         # region #-- set flow title --#
@@ -563,7 +543,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
         self._data: dict = dict(config_entry.data)
         self._errors: dict = {}
         self._options: dict = dict(config_entry.options)
-        self._log_formatter = VirginTvLogger()
+        self._log_formatter = Logger()
         self._logger_prefix: str = "options "
 
         self.unique_id: str = self._config_entry.unique_id
@@ -573,9 +553,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
         # region #-- check for channel cache cleanup --#
         if self._cache_to_clean.get(CONF_CACHE_CLEAR, DEF_CACHE_CLEAR):
             _LOGGER.debug(
-                self._log_formatter.message_format(
-                    "calling service to clear channel cache"
-                )
+                self._log_formatter.format("calling service to clear channel cache")
             )
             asyncio.run_coroutine_threadsafe(
                 coro=self.hass.services.async_call(
@@ -586,9 +564,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
                 loop=self.hass.loop,
             )
             _LOGGER.debug(
-                self._log_formatter.message_format(
-                    "calling service to clear listings cache"
-                )
+                self._log_formatter.format("calling service to clear listings cache")
             )
             asyncio.run_coroutine_threadsafe(
                 coro=self.hass.services.async_call(
@@ -602,14 +578,12 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
 
         # region #-- check for credential cache cleanup --#
         if self._cache_to_clean.get(CONF_CREDS_CLEAR, DEF_CREDS_CLEAR):
-            _LOGGER.debug(self._log_formatter.message_format("clearing credentials"))
+            _LOGGER.debug(self._log_formatter.format("clearing credentials"))
             to_clear = (CONF_CHANNEL_PWD, CONF_CHANNEL_USER, CONF_CREDS_CLEAR)
             for prop in to_clear:
                 self._options.pop(prop, None)
             _LOGGER.debug(
-                self._log_formatter.message_format(
-                    "calling service to clear auth cache"
-                )
+                self._log_formatter.format("calling service to clear auth cache")
             )
             asyncio.run_coroutine_threadsafe(
                 coro=self.hass.services.async_call(
@@ -628,7 +602,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input=None
     ) -> data_entry_flow.FlowResult:
         """Prompt for confirmation if other instances are configured."""
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             if user_input.get(CONF_CACHE_CONFIRM, DEF_CACHE_CONFIRM):
                 self._cache_do_cleanup()
@@ -662,7 +636,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
 
         These options aren't stored in the entry but should kick off actions to clean up
         """
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             configured_instances = self.hass.config_entries.async_entries(domain=DOMAIN)
             self._cache_to_clean.update(user_input)
@@ -692,7 +666,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
         Should be able to determine this automatically really but don't have any other platforms
         to test with. This step is only available after initial configuration.
         """
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             self._options.update(user_input)
             return await self.async_step_options()
@@ -708,13 +682,13 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, _=None) -> data_entry_flow.FlowResult:
         """Entry point for the flow."""
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
 
         return await self.async_step_device_platform()
 
     async def async_step_options(self, user_input=None) -> data_entry_flow.FlowResult:
         """Display generic options for the integration."""
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             self._options.update(user_input)
             # region #-- where to next? --#
@@ -744,7 +718,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_timeouts(self, user_input=None) -> data_entry_flow.FlowResult:
         """Prompt for configurable timeouts."""
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             self._options[CONF_CONNECT_TIMEOUT] = DEF_CONNECT_TIMEOUT
             self._options[CONF_COMMAND_TIMEOUT] = DEF_COMMAND_TIMEOUT
@@ -769,13 +743,13 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
 
         This should alwats be the last step in the flow.
         """
-        _LOGGER.debug(self._log_formatter.message_format("entered"))
+        _LOGGER.debug(self._log_formatter.format("entered"))
         title = (
             self.context.get(CONF_TITLE_PLACEHOLDERS, {}).get(CONF_FLOW_NAME)
             or DEF_FLOW_NAME
         )
         _LOGGER.debug(
-            self._log_formatter.message_format("title: %s; options: %s"),
+            self._log_formatter.format("title: %s; options: %s"),
             self._config_entry.unique_id,
             title,
             self._options,
@@ -788,7 +762,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
 
         Should only reach here if the device platform selected is V6
         """
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             self._options.update(user_input)
             return await self.async_step_timeouts()
@@ -806,7 +780,7 @@ class VirginTvOptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input=None
     ) -> data_entry_flow.FlowResult:
         """Prompt for the Virgin Media credentials."""
-        _LOGGER.debug(self._log_formatter.message_format("user_input: %s"), user_input)
+        _LOGGER.debug(self._log_formatter.format("user_input: %s"), user_input)
         if user_input is not None:
             self._options.update(user_input)
             if self._options.get(CONF_DEVICE_PLATFORM) == "v6":
