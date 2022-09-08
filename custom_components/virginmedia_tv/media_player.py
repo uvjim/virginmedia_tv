@@ -63,6 +63,7 @@ from .const import (
     CONF_COMMAND_TIMEOUT,
     CONF_CONNECT_TIMEOUT,
     CONF_DEVICE_PLATFORM,
+    CONF_DEVICE_USE_SETCH,
     CONF_HOST,
     CONF_IDLE_TIMEOUT,
     CONF_PORT,
@@ -74,6 +75,7 @@ from .const import (
     DEF_CHANNEL_REGION,
     DEF_CHANNEL_USE_MEDIA_BROWSER,
     DEF_DEVICE_PLATFORM,
+    DEF_DEVICE_USE_SETCH,
     DEF_IDLE_TIMEOUT,
     DEF_SCAN_INTERVAL,
     DOMAIN,
@@ -1196,7 +1198,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         if self._state == STATE_OFF:
             await self.async_turn_on()
 
-        channel_number = int(source.split(_CHANNEL_SEPARATOR)[0])
+        channel_number = source.split(_CHANNEL_SEPARATOR)[0]
         _LOGGER.debug(
             self._log_formatter.message_format("changing source to: %s"), channel_number
         )
@@ -1206,11 +1208,22 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                     self._log_formatter.message_format("issuing channel change")
                 )
                 try:
-                    await self._client.set_channel(channel_number=channel_number)
+                    if self._config.options.get(
+                        CONF_DEVICE_USE_SETCH, DEF_DEVICE_USE_SETCH
+                    ):
+                        await self._client.set_channel(
+                            channel_number=int(channel_number)
+                        )
+                    else:
+                        for number in str(channel_number):
+                            await self._client.send_ircode(
+                                f"NUM{number}", wait_for_reply=False
+                            )
                 except VirginMediaInvalidChannel as err:
                     _LOGGER.warning(self._log_formatter.message_format("%s"), err)
-                except Exception:
-                    raise
+                except Exception as err:
+                    _LOGGER.debug(self._log_formatter.message_format("%s"), err)
+                    raise err from None
 
         _LOGGER.debug(self._log_formatter.message_format("exited"))
 
