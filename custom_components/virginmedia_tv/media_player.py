@@ -945,7 +945,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                 can_play=True,
                 media_class=MEDIA_CLASS_URL,  # fake the media class so the layout is a list
                 media_content_type=MEDIA_TYPE_CHANNEL,
-                media_content_id=channel.get("channelNumber"),
+                media_content_id=str(channel.get("channelNumber")),
                 thumbnail=self._channel_logo(channel_number=channel.get("channelNumber")),
                 title=self._channel_title(channel_number=channel.get('channelNumber')),
             )
