@@ -21,6 +21,7 @@ from .exceptions import (
     VirginMediaNotLive,
     format_error_message,
 )
+from .logger import Logger
 
 # endregion
 
@@ -86,6 +87,7 @@ class Client:
         self._data_callback: List = []
         self._host: str = host
         self._lock_read: asyncio.Lock = asyncio.Lock()
+        self._log_formatter: Logger = Logger()
         self._port: int = port
         self._timeout: float = timeout
         self._reader: Optional[asyncio.StreamReader] = None
@@ -117,7 +119,9 @@ class Client:
                 if wait_for_reply:
                     await self.wait_for_data()
         except Exception as err:
-            _LOGGER.debug("_send --> type: %s, message: %s", type(err), err)
+            _LOGGER.debug(
+                self._log_formatter.format("type: %s, message: %s"), type(err), err
+            )
             if isinstance(err, asyncio.TimeoutError):
                 raise VirginMediaCommandTimeout from err
             elif isinstance(err, VirginMediaError):
@@ -130,10 +134,12 @@ class Client:
     # region #-- public methods --#
     async def connect(self) -> None:
         """Create a connection to the device."""
-        _LOGGER.debug("connect --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
             _LOGGER.debug(
-                "connect --> connecting to %s on port %d with timeout %0.1fs",
+                self._log_formatter.format(
+                    "connecting to %s on port %d with timeout %0.1fs"
+                ),
                 self._host,
                 self._port,
                 self._timeout,
@@ -143,7 +149,9 @@ class Client:
                 open_future, self._timeout
             )
             _LOGGER.debug(
-                "connect --> connected to %s on port %d", self._host, self._port
+                self._log_formatter.format("connected to %s on port %d"),
+                self._host,
+                self._port,
             )
         except (
             OSError,
@@ -151,37 +159,41 @@ class Client:
             ConnectionResetError,
             asyncio.TimeoutError,
         ) as err:
-            _LOGGER.debug("connect --> error --> type: %s, message: %s", type(err), err)
+            _LOGGER.debug(
+                self._log_formatter.format("type: %s, message: %s"), type(err), err
+            )
             if isinstance(err, asyncio.TimeoutError):
                 raise VirginMediaCommandTimeout from err
-            else:
-                raise VirginMediaError(format_error_message(err)) from err
-        _LOGGER.debug("connect --> exited")
+            raise VirginMediaError(format_error_message(err)) from err
+
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def disconnect(self) -> None:
         """Disconnect from the device."""
-        _LOGGER.debug("disconnect --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         if self._writer:
             _LOGGER.debug(
-                "disconnect --> disconnecting from %s on port %d",
+                self._log_formatter.format("disconnecting from %s on port %d"),
                 self._host,
                 self._port,
             )
             self._writer.close()
             await self._writer.wait_closed()
             _LOGGER.debug(
-                "disconnect -> disconnected from %s on port %d", self._host, self._port
+                self._log_formatter.format("disconnected from %s on port %d"),
+                self._host,
+                self._port,
             )
             self._writer = None
             self._reader = None
         else:
             _LOGGER.debug(
-                "disconnect --> not currently connected to %s on port %d",
+                self._log_formatter.format("not currently connected to %s on port %d"),
                 self._host,
                 self._port,
             )
 
-        _LOGGER.debug("disconnect --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def send_ircode(self, code: str, wait_for_reply: bool = True) -> None:
         """Send an infrared code to the device.
@@ -190,9 +202,9 @@ class Client:
         :param wait_for_reply: True if intending to wait for a response
         :return: None
         """
-        _LOGGER.debug("send_ircode --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
-            _LOGGER.debug("send_ircode --> sending ircode: %s", code)
+            _LOGGER.debug(self._log_formatter.format("sending ircode: %s"), code)
             await self._send(f"ircode {code}", wait_for_reply=wait_for_reply)
         except VirginMediaError as err:
             if str(err).lower() == "invalid_key":
@@ -200,11 +212,11 @@ class Client:
             else:
                 raise
         except Exception as err:
-            _LOGGER.error(err)
+            _LOGGER.error(self._log_formatter.format("%s"), err)
         else:
-            _LOGGER.debug("send_ircode --> ircode sent: %s", code)
+            _LOGGER.debug(self._log_formatter.format("ircode sent: %s"), code)
 
-        _LOGGER.debug("send_ircode --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def send_keyboard(self, code: str, wait_for_reply: bool = True) -> None:
         """Send a keyboard code to the device.
@@ -213,18 +225,20 @@ class Client:
         :param wait_for_reply: True to wait for a response after sending
         :return: None
         """
-        _LOGGER.debug("send_keyboard --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
-            _LOGGER.debug("send_keyboard --> sending keyboard: %s", code)
+            _LOGGER.debug(self._log_formatter.format("sending keyboard: %s"), code)
             await self._send(f"keyboard {code}", wait_for_reply=wait_for_reply)
         except VirginMediaError as err:
-            _LOGGER.warning("send_keyboard --> type: %s, message: %s", type(err), err)
+            _LOGGER.warning(
+                self._log_formatter.format("type: %s, message: %s", type(err)), err
+            )
             if str(err).lower() == "invalid_key":
                 raise VirginMediaInvalidKey(key_code=code) from err
         else:
-            _LOGGER.debug("send_keyboard --> keyboard sent: %s", code)
+            _LOGGER.debug(self._log_formatter.format("keyboard sent: %s"), code)
 
-        _LOGGER.debug("send_keyboard --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def send_teleport(self, code: str) -> None:
         """Send a teleport code to the device.
@@ -232,17 +246,17 @@ class Client:
         :param code: the teleport code to send
         :return: None
         """
-        _LOGGER.debug("send_teleport --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
-            _LOGGER.debug("send_teleport --> sending teleport: %s", code)
+            _LOGGER.debug(self._log_formatter.format("sending teleport: %s"), code)
             await self._send(f"teleport {code}")
         except VirginMediaError as err:
             if str(err).lower() == "invalid_command":
                 raise VirginMediaInvalidCommand(command=code) from err
         else:
-            _LOGGER.debug("send_teleport --> teleport sent: %s", code)
+            _LOGGER.debug(self._log_formatter.format("teleport sent: %s"), code)
 
-        _LOGGER.debug("send_teleport --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def set_channel(self, channel_number: int) -> None:
         """Change the channel on the device.
@@ -250,30 +264,32 @@ class Client:
         :param channel_number: the channel number to change to
         :return: None
         """
-        _LOGGER.debug("set_channel --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
             _LOGGER.debug(
-                "set_channel --> setting channel number to: %d", channel_number
+                self._log_formatter.format("setting channel number to: %d"),
+                channel_number,
             )
             await self._send(f"setch {channel_number}")
         except VirginMediaError as err:
             if str(err).lower() == "no_live":
                 raise VirginMediaNotLive from err
-            elif str(err).lower() == "invalid_channel":
+            if str(err).lower() == "invalid_channel":
                 raise VirginMediaInvalidChannel(channel_number=channel_number) from err
-            else:
-                raise
+            raise
         else:
-            _LOGGER.debug("set_channel --> channel number set to: %d", channel_number)
+            _LOGGER.debug(
+                self._log_formatter.format("channel number set to: %d"), channel_number
+            )
 
-        _LOGGER.debug("set_channel --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def wait_for_data(self) -> None:
         """Process the data from the device.
 
         The device only returns an error or the current channel number
         """
-        _LOGGER.debug("wait_for_data --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         async with self._lock_read:
             buffer_size = 1024
             try:
@@ -285,18 +301,17 @@ class Client:
                 if isinstance(err, asyncio.TimeoutError):
                     self._tivo._set_channel_number(None)
                     raise VirginMediaCommandTimeout from err
-                else:
-                    _LOGGER.warning(
-                        "wait_for_data --> line 276 --> type: %s, message: %s",
-                        type(err),
-                        err,
-                    )
-                    raise VirginMediaError(format_error_message(err)) from None
+
+                _LOGGER.warning(
+                    self._log_formatter.format("type: %s, message: %s"),
+                    type(err),
+                    err,
+                )
+                raise VirginMediaError(format_error_message(err)) from None
             else:
-                _LOGGER.debug("wait_for_data --> raw data: %s", data)
+                _LOGGER.debug(self._log_formatter.format("raw data: %s"), data)
 
                 if not data:
-                    # noinspection PyProtectedMember
                     self._tivo._set_channel_number()
                     raise VirginMediaConnectionReset from None
 
@@ -314,27 +329,27 @@ class Client:
                     raise VirginMediaError(data)
 
                 if self._data_callback:
-                    _LOGGER.debug("wait_for_data --> executing callbacks")
+                    _LOGGER.debug(self._log_formatter.format("executing callbacks"))
                     for func in self._data_callback:
                         if isinstance(func, Callable):
                             func(self._tivo)
 
-        _LOGGER.debug("wait_for_data --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     def add_data_callback(self, callback: Callable) -> None:
         """Add a callback for execution after data has been retrieved."""
-        _LOGGER.debug("add_data_callback --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         self._data_callback.append(callback)
-        _LOGGER.debug("add_data_callback --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     def remove_data_callback(self, callback: Callable) -> None:
         """Remove the given callback from being processed."""
-        _LOGGER.debug("remove_data_callback --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         try:
             self._data_callback.remove(callback)
         except ValueError:
             pass
-        _LOGGER.debug("remove_data_callback --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
 
