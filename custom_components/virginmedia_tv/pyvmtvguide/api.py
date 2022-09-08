@@ -23,6 +23,7 @@ from .exceptions import (
     VirginMediaTVGuideForbidden,
     VirginMediaTVGuideUnauthorized,
 )
+from .logger import Logger
 
 # endregion
 
@@ -44,6 +45,7 @@ class API:
         self._auth_uri: str = ""
         self._auth_username: str = ""
         self._auth_validity_token: str = ""
+        self._log_formatter: Logger = Logger()
         self._login_redirect: str = ""
         self._password: str = password
         self._session: Optional[aiohttp.ClientSession] = None
@@ -61,14 +63,15 @@ class API:
     # region #-- private methods --#
     def _create_session(self) -> None:
         """Initialise the client session."""
-        _LOGGER.debug("_create_session --> creating session")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         self._session = aiohttp.ClientSession(raise_for_status=True)
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_close_session(self) -> None:
         """Close the client session."""
-        _LOGGER.debug("_async_close_session --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         await self._session.close()
-        _LOGGER.debug("_async_close_session --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_get_request(self, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Issue a GET request to the online service.
@@ -80,7 +83,7 @@ class API:
         :return: the reponse as it was receieved
         """
         _LOGGER.debug(
-            "_async_get_request --> entered, url: %s, kwargs: %s", url, kwargs
+            self._log_formatter.format("entered, url: %s, kwargs: %s"), url, kwargs
         )
         try:
             resp: aiohttp.ClientResponse = await self._session.get(
@@ -93,11 +96,11 @@ class API:
         else:
             if resp.status in (200, 302):
                 return resp
-        _LOGGER.debug("_async_get_request --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def _async_get_auth_code(self) -> None:
         """Retrieve an auth code."""
-        _LOGGER.debug("_async_get_auth_code --> Step 4 --> entered")
+        _LOGGER.debug(self._log_formatter.format("Step 4 --> entered"))
         try:
             resp = await self._async_get_request(url=self._login_redirect)
         except Exception as err:
@@ -108,20 +111,20 @@ class API:
             if len(code_matches) != 1:
                 raise ValueError
             self._auth_code = code_matches[0]
-        _LOGGER.debug("_async_get_auth_code --> Step 4 --> exited")
+        _LOGGER.debug(self._log_formatter.format("Step 4 --> exited"))
 
     async def _async_get_auth_cookie(self) -> None:
         """Retrieve a cookie for authorisation."""
-        _LOGGER.debug("_async_get_auth_cookie --> Step 2 --> entered")
+        _LOGGER.debug(self._log_formatter.format("Step 2 --> entered"))
         try:
             await self._async_get_request(url=self._auth_uri)
         except Exception as err:
             raise VirginMediaTVGuideError(err) from None
-        _LOGGER.debug("_async_get_auth_cookie --> Step 2 --> exited")
+        _LOGGER.debug(self._log_formatter.format("Step 2 --> exited"))
 
     async def _async_get_auth_details(self) -> None:
         """Get the initial details about where to go."""
-        _LOGGER.debug("_async_get_auth_details --> Step 1 --> entered")
+        _LOGGER.debug(self._log_formatter.format("Step 1 --> entered"))
         try:
             resp = await self._async_get_request(url=DEF_URL_AUTH)
             resp_json = await resp.json()
@@ -133,11 +136,11 @@ class API:
             self._auth_validity_token = resp_json.get("session", {}).get(
                 "validityToken"
             )
-        _LOGGER.debug("_async_get_auth_details --> Step 1 --> exited")
+        _LOGGER.debug(self._log_formatter.format("Step 1 --> exited"))
 
     async def _async_get_oesp_code(self) -> None:
         """Get the codes we'll need later."""
-        _LOGGER.debug("_async_get_oesp_code --> Step 6 --> entered")
+        _LOGGER.debug(self._log_formatter.format("Step 6 --> entered"))
         try:
             resp = await self._async_post_request(
                 url=DEF_URL_SESSION,
@@ -152,11 +155,11 @@ class API:
             raise VirginMediaTVGuideError(err) from None
         else:
             self._auth_session = resp_json
-        _LOGGER.debug("_async_get_oesp_code --> Step 6 --> exited")
+        _LOGGER.debug(self._log_formatter.format("Step 6 --> exited"))
 
     async def _async_login(self) -> None:
         """Send the service credentials."""
-        _LOGGER.debug("_async_login --> Step 3 --> entered")
+        _LOGGER.debug(self._log_formatter.format("Step 3 --> entered"))
         try:
             resp: aiohttp.ClientResponse = await self._async_post_request(
                 url=DEF_URL_LOGIN,
@@ -170,7 +173,7 @@ class API:
             raise VirginMediaTVGuideError(err) from None
         else:
             self._login_redirect = resp.headers.get("x-redirect-location")
-        _LOGGER.debug("_async_login --> Step 3 --> exited")
+        _LOGGER.debug(self._log_formatter.format("Step 3 --> exited"))
 
     async def _async_post_request(self, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Send a POST request.
@@ -193,7 +196,7 @@ class API:
 
     async def _async_reauthorize(self) -> None:
         """Reauthorise with the additional information."""
-        _LOGGER.debug("_async_reauthorize --> Step 5 --> entered")
+        _LOGGER.debug(self._log_formatter.format("Step 5 --> entered"))
         try:
             resp = await self._async_post_request(
                 url=DEF_URL_AUTH,
@@ -211,7 +214,7 @@ class API:
         else:
             self._auth_refresh_token = resp_json.get("refreshToken", "")
             self._auth_username = resp_json.get("username", "")
-        _LOGGER.debug("_async_reauthorize --> Step 5 --> exited")
+        _LOGGER.debug(self._log_formatter.format("Step 5 --> exited"))
 
     # endregion
 
@@ -228,7 +231,7 @@ class API:
 
         :return: an object containing all the channels as they were returned
         """
-        _LOGGER.debug("async_get_channels --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         if not self._auth_session:
             await self.async_login()
 
@@ -265,7 +268,7 @@ class API:
             else:
                 ret = resp_json
 
-        _LOGGER.debug("async_get_channels --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
         return ret
 
     async def async_get_listing(
@@ -283,13 +286,13 @@ class API:
         :param location_id: location (will use the location from login if it is available)
         :return: object containing all the listings as returned by the service
         """
-        _LOGGER.debug("async_get_listing --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
 
         if not self._auth_session:
             await self.async_login()
 
         if not location_id:
-            _LOGGER.debug("async_get_listing --> using stored location ID")
+            _LOGGER.debug(self._log_formatter.format("using stored location ID"))
             location_id = self._auth_session.get("locationId")
 
         ret = None
@@ -310,12 +313,12 @@ class API:
         else:
             ret = resp_json
 
-        _LOGGER.debug("async_get_listing --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
         return ret
 
     async def async_login(self) -> None:
         """Carry out a full login."""
-        _LOGGER.debug("async_login --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         if not self._session:
             self._create_session()
 
@@ -325,7 +328,7 @@ class API:
         await self._async_get_auth_code()
         await self._async_reauthorize()
         await self._async_get_oesp_code()
-        _LOGGER.debug("async_login --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
 
@@ -365,6 +368,7 @@ class TVChannelLists:
     def __init__(self) -> None:
         """Initialise."""
         self._channel_key: dict = {}
+        self._log_formatter: Logger = Logger()
         self._session: aiohttp.ClientSession
         self._source: str = ""
 
@@ -380,10 +384,11 @@ class TVChannelLists:
     # region #-- private methods --#
     def _create_session(self) -> None:
         """Initialise the client session."""
-        _LOGGER.debug("_create_session --> creating session")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         self._session: aiohttp.ClientSession = aiohttp.ClientSession(
             raise_for_status=True
         )
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     def _get_channel_resolution(self, channel: bs4.element.Tag) -> str:
         """Get the resolution of the channel based on the information given.
@@ -420,11 +425,11 @@ class TVChannelLists:
         :param table: the table as it was scraped
         :return: a list of objects representing the values on the rows
         """
-        _LOGGER.debug("_table_to_list --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         ret: list = []
 
         # region #-- get the column headings --#
-        _LOGGER.debug("_table_to_list --> retrieving column headings")
+        _LOGGER.debug(self._log_formatter.format("retrieving column headings"))
         th_cells: bs4.element.ResultSet = table.find_all("th")
         headings: List[str] = []
         th_cell: bs4.element.Tag
@@ -432,11 +437,13 @@ class TVChannelLists:
             headings.append(th_cell.text.strip().lower())
         if len(set(headings).intersection(self._CHANNEL_COL_PLATFORMS)) == 0:
             return ret
-        _LOGGER.debug("_table_to_list --> column headings found: %d", len(headings))
+        _LOGGER.debug(
+            self._log_formatter.format("column headings found: %d"), len(headings)
+        )
         # endregion
 
         # region #-- process the rows --#
-        _LOGGER.debug("_table_to_list --> processing rows")
+        _LOGGER.debug(self._log_formatter.format("processing rows"))
         table_rows: bs4.element.ResultSet = table.find_all("tr")
         row_idx: int
         row_data: bs4.element.Tag
@@ -445,7 +452,9 @@ class TVChannelLists:
             row_cells: bs4.element.ResultSet = row_data.find_all("td")
             if int(row_cells[0].attrs.get("colspan", 0)):
                 _LOGGER.debug(
-                    "_table_to_list --> skipping row %d - seems to be a divider",
+                    self._log_formatter.format(
+                        "skipping row %d - seems to be a divider"
+                    ),
                     row_idx,
                 )
             else:
@@ -484,17 +493,17 @@ class TVChannelLists:
                             row_spans[cell_idx] -= 1
                 if row:
                     ret.append(row)
-        _LOGGER.debug("_table_to_list --> processed rows: %d", len(table_rows))
+        _LOGGER.debug(self._log_formatter.format("processed rows: %d"), len(table_rows))
         # endregion
-        _LOGGER.debug("_table_to_list --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
         return ret
 
     async def _async_close_session(self) -> None:
         """Close the client session."""
-        _LOGGER.debug("_async_close_session --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         await self._session.close()
-        _LOGGER.debug("_async_close_session --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
 
@@ -507,13 +516,13 @@ class TVChannelLists:
         :param source: string containing the source from the online service
         :return: None
         """
-        _LOGGER.debug("load_source --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         self._source = source
-        _LOGGER.debug("load_source --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_fetch(self) -> None:
         """Retrieve the data from the onine service."""
-        _LOGGER.debug("async_fetch --> entered")
+        _LOGGER.debug(self._log_formatter.format("entered"))
         async with self._session as session:
             try:
                 resp: aiohttp.ClientResponse = await session.get(url=self._CHANNEL_URL)
@@ -521,7 +530,7 @@ class TVChannelLists:
                 raise
             else:
                 self._source = await resp.text(encoding="utf-8")
-        _LOGGER.debug("async_fetch --> exited")
+        _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
 
