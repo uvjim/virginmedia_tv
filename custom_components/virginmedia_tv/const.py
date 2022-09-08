@@ -1,4 +1,4 @@
-"""Constants and defaults"""
+"""Constants and defaults."""
 
 DOMAIN: str = "virginmedia_tv"
 

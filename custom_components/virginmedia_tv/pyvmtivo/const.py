@@ -1,4 +1,4 @@
-"""Constants and defaults"""
+"""Constants and defaults."""
 
 PACKAGE_NAME: str = "pyvmtivo"
 PACKAGE_AUTHOR: str = "uvjim"

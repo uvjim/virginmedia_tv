@@ -1,5 +1,6 @@
-""""""
+"""CLI for pyvmtvguide and pyvmtivo."""
 
+# region #-- imports --#
 import asyncio
 import datetime
 import json
@@ -8,56 +9,80 @@ import os
 import time
 from argparse import ArgumentParser
 
-from pyvmtivo.client import Client
-from pyvmtivo.exceptions import (
+from .pyvmtivo.client import Client
+from .pyvmtivo.exceptions import (
     VirginMediaError,
     VirginMediaInvalidChannel,
     VirginMediaNotLive,
 )
-from pyvmtvguide.api import API
+from .pyvmtvguide.api import API
+
+# endregion
 
 _LOGGER = logging.getLogger("pyvmtvguide.cli")
 
 
 def _setup_args(parser: ArgumentParser) -> None:
-    """Initialise the arguments for the CLI"""
-
-    parser.add_argument("-v", "--verbose", action="count", default=0, help="Set verbosity level")
+    """Initialise the arguments for the CLI."""
+    parser.add_argument(
+        "-v", "--verbose", action="count", default=0, help="Set verbosity level"
+    )
 
     sub_parsers = parser.add_subparsers(
         dest="target",
         title="Targets",
         description="Actions to carry out",
-        help="Select one of these actions"
+        help="Select one of these actions",
     )
 
     parser_guide = sub_parsers.add_parser("guide", help="")
     parser_tivo = sub_parsers.add_parser("tivo", help="")
 
     parser_tivo.add_argument("-a", "--address", required=True, help="Address of the V6")
-    parser_tivo.add_argument("-t", "--timeout", type=float, default=1, help="Set the connection timeout")
+    parser_tivo.add_argument(
+        "-t", "--timeout", type=float, default=1, help="Set the connection timeout"
+    )
 
-    parser_guide.add_argument("-p", "--password", type=str, required=True, help="Virgin Media password")
-    parser_guide.add_argument("-u", "--username", type=str, required=True, help="Virgin Media username")
+    parser_guide.add_argument(
+        "-p", "--password", type=str, required=True, help="Virgin Media password"
+    )
+    parser_guide.add_argument(
+        "-u", "--username", type=str, required=True, help="Virgin Media username"
+    )
 
     sub_parsers_guide = parser_guide.add_subparsers(dest="target_guide")
     sub_parsers_tivo = parser_tivo.add_subparsers(dest="target_tivo")
 
-    parser_channels = sub_parsers_guide.add_parser("channels", help="Log output from the session")
-    parser_channels.add_argument("-c", "--cache-file", type=str, required=True, help="Cache file")
+    parser_channels = sub_parsers_guide.add_parser(
+        "channels", help="Log output from the session"
+    )
+    parser_channels.add_argument(
+        "-c", "--cache-file", type=str, required=True, help="Cache file"
+    )
 
-    parser_listings = sub_parsers_guide.add_parser("listings", help="Log output from the session")
-    parser_listings.add_argument("-c", "--channel-id", type=str, required=True, help="Channel ID")
-    parser_listings.add_argument("-d", "--duration", type=int, default=24, help="Hours of listings to retrieve")
-    parser_listings.add_argument("-l", "--location-id", type=int, required=False, help="Location ID")
+    parser_listings = sub_parsers_guide.add_parser(
+        "listings", help="Log output from the session"
+    )
+    parser_listings.add_argument(
+        "-c", "--channel-id", type=str, required=True, help="Channel ID"
+    )
+    parser_listings.add_argument(
+        "-d", "--duration", type=int, default=24, help="Hours of listings to retrieve"
+    )
+    parser_listings.add_argument(
+        "-l", "--location-id", type=int, required=False, help="Location ID"
+    )
 
-    parser_set_channel = sub_parsers_tivo.add_parser("setchannel", help="Set the channel on the V6")
-    parser_set_channel.add_argument("-n", "--channel-number", type=int, required=True, help="Channel number")
+    parser_set_channel = sub_parsers_tivo.add_parser(
+        "setchannel", help="Set the channel on the V6"
+    )
+    parser_set_channel.add_argument(
+        "-n", "--channel-number", type=int, required=True, help="Channel number"
+    )
 
 
 async def main():
-    """"""
-
+    """React to arguments."""
     # region #-- handle arguments --#
     args_parser = ArgumentParser(prog="pyvmtvguide")
     _setup_args(parser=args_parser)
@@ -77,22 +102,25 @@ async def main():
 
     if args.target.lower() == "guide":
         if args.target_guide.lower() == "channels":
-            async def _async_get_channels_from_api(cache_session=None):
-                """"""
 
+            async def _async_get_channels_from_api(cache_session=None):
+                """Retrieve the channel details from the API."""
                 _LOGGER.debug("Loading channels from API")
-                async with API(username=args.username, password=args.password, existing_session=cache_session) as api:
+                async with API(
+                    username=args.username,
+                    password=args.password,
+                    existing_session=cache_session,
+                ) as api:
                     await api.async_login()
                     api_channels = await api.async_get_channels()
                     api_channels["auth_session"] = api.session_details
-                    with open(args.cache_file, "w") as cache_file:
+                    with open(args.cache_file, "w", encoding="utf8") as cache_file:
                         json.dump(api_channels, cache_file, indent=2)
 
             def _load_channels_from_cache() -> dict:
-                """"""
-
+                """Load the channels from the cache file."""
                 _LOGGER.debug("Loading channels from the cache")
-                with open(args.cache_file, "r") as cache_file:
+                with open(args.cache_file, "r", encoding="utf8") as cache_file:
                     cached_channels = json.load(cache_file)
                 return cached_channels
 
@@ -108,11 +136,16 @@ async def main():
                 update_interval = 24
                 update_at = last_updated + (update_interval * 60 * 60)
                 if update_at < current_epoch:
-                    _LOGGER.debug(f"Cache is stale by {int(current_epoch - update_at)} seconds")
+                    _LOGGER.debug(
+                        "Cache is stale by %i seconds", int(current_epoch - update_at)
+                    )
                     await _async_get_channels_from_api()
                     channels = _load_channels_from_cache()
                 else:
-                    _LOGGER.debug(f"Cache is still good for {int(update_at - current_epoch)} seconds")
+                    _LOGGER.debug(
+                        "Cache is still good for %i seconds",
+                        int(update_at - current_epoch),
+                    )
                 # endregion
 
             source_list = [
@@ -132,11 +165,16 @@ async def main():
     elif args.target.lower() == "tivo":
         if args.target_tivo.lower() == "setchannel":
             _LOGGER.info("Setting channel")
-            async with Client(host=args.address, timeout=args.timeout) as v6:
+            async with Client(host=args.address, timeout=args.timeout) as v6_device:
                 try:
-                    await v6.set_channel(channel_number=args.channel_number)
-                except (VirginMediaError, VirginMediaInvalidChannel, VirginMediaNotLive) as e:
-                    _LOGGER.error(e)
+                    await v6_device.set_channel(channel_number=args.channel_number)
+                except (
+                    VirginMediaError,
+                    VirginMediaInvalidChannel,
+                    VirginMediaNotLive,
+                ) as exc:
+                    _LOGGER.error(exc)
+
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
