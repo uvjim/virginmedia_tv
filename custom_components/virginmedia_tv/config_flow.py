@@ -339,7 +339,7 @@ class VirginTvHandler(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.debug(self._log_formatter.format("running login task"))
             await self.task_login
             _LOGGER.debug(self._log_formatter.format("returned from login task"))
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-except
             _LOGGER.debug(self._log_formatter.format("exception: %s"), err)
             return self.async_abort(reason="abort_login")
 
