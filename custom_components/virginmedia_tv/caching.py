@@ -5,7 +5,6 @@ import glob
 import json
 import logging
 import os
-from abc import ABC
 from typing import Any, List, Optional
 
 import homeassistant.util.dt as dt_util
@@ -38,9 +37,8 @@ class VirginMediaCache:
     _cache_type: VirginMediaCacheType
     _leaf_path: str
 
-    async def async_fetch(self, *args, **kwargs) -> None:
+    async def async_fetch(self) -> None:
         """Stub for fetching details to cache."""
-        raise NotImplementedError
 
     def __init__(self, hass: HomeAssistant, unique_id: str, age: int = 0) -> None:
         """Initialise.
@@ -111,9 +109,8 @@ class VirginMediaCache:
             self._cache_type,
         )
 
-    def fetch(self, *args, **kwargs) -> None:
+    def fetch(self) -> None:
         """Stub for fetching details to cache."""
-        raise NotImplementedError
 
     def load(self) -> Any:
         """Load the contents of the cache into memory."""
@@ -222,7 +219,7 @@ class VirginMediaCache:
         return self._hass.config.path(DOMAIN, self._leaf_path)
 
 
-class VirginMediaCacheAuth(VirginMediaCache, ABC):
+class VirginMediaCacheAuth(VirginMediaCache):
     """Representation of the Authentication cache."""
 
     _cache_type = VirginMediaCacheType.AUTH
@@ -241,6 +238,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
     _cache_type = VirginMediaCacheType.CHANNELS
     _leaf_path = DEF_CHANNEL_FILE
 
+    # pylint: disable=arguments-differ
     async def async_fetch(self, username: str, password: str) -> None:
         """Fetch the channels from the online service and cache locally."""
         _LOGGER.debug(
@@ -269,7 +267,6 @@ class VirginMediaCacheChannels(VirginMediaCache):
             if channel_api.session_details != cached_session.contents:
                 _LOGGER.debug(self._log_formatter.format("API session details changed"))
                 cached_session.contents = channel_api.session_details
-
         except VirginMediaTVGuideError as err:
             _LOGGER.error(
                 "Invalid credentials used when attempting to cache the available channels"
@@ -281,7 +278,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
                 type(err),
                 err,
             )
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error(
                 self._log_formatter.format(
                     "type: %s, message: %s", include_lineno=True
@@ -300,7 +297,7 @@ class VirginMediaCacheChannels(VirginMediaCache):
             )
 
 
-class VirginMediaCacheChannelMappings(VirginMediaCache, ABC):
+class VirginMediaCacheChannelMappings(VirginMediaCache):
     """Representation of the channel mappings."""
 
     _cache_type = VirginMediaCacheType.CHANNEL_MAPPINGS
@@ -325,7 +322,7 @@ class VirginMediaCacheChannelMappings(VirginMediaCache, ABC):
         try:
             async with TVChannelLists() as tvc:
                 await tvc.async_fetch()
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error(
                 self._log_formatter.format(
                     "type: %s, message: %s", include_lineno=True
@@ -351,7 +348,7 @@ class VirginMediaCacheChannelMappings(VirginMediaCache, ABC):
         self.dump()
 
 
-class VirginMediaCacheListings(VirginMediaCache, ABC):
+class VirginMediaCacheListings(VirginMediaCache):
     """Representation of the Listings cache."""
 
     _cache_type = VirginMediaCacheType.LISTINGS
@@ -374,6 +371,7 @@ class VirginMediaCacheListings(VirginMediaCache, ABC):
         self._station_id = station_id
         self._leaf_path = f"{self._station_id}.json"
 
+    # pylint: disable=arguments-differ
     async def async_fetch(self, username: str, password: str) -> None:
         """Retrieve the listings from the API."""
         _LOGGER.debug(
@@ -407,8 +405,7 @@ class VirginMediaCacheListings(VirginMediaCache, ABC):
             if listing_api.session_details != cached_session.contents:
                 _LOGGER.debug(self._log_formatter.format("API session details changed"))
                 cached_session.contents = listing_api.session_details
-
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error(
                 self._log_formatter.format(
                     "type: %s, message: %s", include_lineno=True
