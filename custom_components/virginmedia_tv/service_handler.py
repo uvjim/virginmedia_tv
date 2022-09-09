@@ -54,7 +54,7 @@ class VirginMediaServiceHandler:
         if method:
             try:
                 await method(**args)
-            except Exception as err:
+            except Exception as err:  # pylint: disable=broad-except
                 _LOGGER.warning(self._log_formatter.format("%s"), err)
 
         _LOGGER.debug(self._log_formatter.format("exited"))
