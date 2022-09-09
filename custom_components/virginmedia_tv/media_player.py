@@ -826,7 +826,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                             code=code,
                             wait_for_reply=self._state not in (STATE_IDLE, STATE_OFF),
                         )
-                    except Exception as err:
+                    except Exception as err:  # pylint: disable=broad-except
                         _LOGGER.debug(
                             self._log_formatter.format(
                                 "type: %s, message: %s", include_lineno=True
@@ -1118,42 +1118,30 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
     async def async_media_pause(self) -> None:
         """Pause the currently playing media."""
         _LOGGER.debug(self._log_formatter.format("entered"))
-        try:
-            await self._async_send_keycode(code="pause")
-        except Exception:
-            raise
-        else:
-            if self._state == STATE_PLAYING:
-                self._state = STATE_PAUSED
-            elif self._state == STATE_PAUSED:
-                self._state = STATE_PLAYING
-            await self.async_update_ha_state()
+        await self._async_send_keycode(code="pause")
+        if self._state == STATE_PLAYING:
+            self._state = STATE_PAUSED
+        elif self._state == STATE_PAUSED:
+            self._state = STATE_PLAYING
+        await self.async_update_ha_state()
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_media_play(self) -> None:
         """Play the media."""
         _LOGGER.debug(self._log_formatter.format("entered"))
-        try:
-            await self._async_send_keycode(code="play")
-        except Exception:
-            raise
-        else:
-            if self._state not in (STATE_OFF, STATE_IDLE):
-                self._state = STATE_PLAYING
-            await self.async_update_ha_state()
+        await self._async_send_keycode(code="play")
+        if self._state not in (STATE_OFF, STATE_IDLE):
+            self._state = STATE_PLAYING
+        await self.async_update_ha_state()
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_media_stop(self) -> None:
         """Stop the media."""
         _LOGGER.debug(self._log_formatter.format("entered"))
-        try:
-            await self._async_send_keycode(code="stop")
-        except Exception:
-            raise
-        else:
-            if self._state == STATE_PAUSED:
-                self._state = STATE_PLAYING
-            await self.async_update_ha_state()
+        await self._async_send_keycode(code="stop")
+        if self._state == STATE_PAUSED:
+            self._state = STATE_PLAYING
+        await self.async_update_ha_state()
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_play_media(self, media_type, media_id, **kwargs) -> None:
@@ -1215,14 +1203,10 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         self._flags[_FLAG_TURNING_OFF] = True
         if self._state not in (STATE_OFF, STATE_IDLE):
             _LOGGER.debug(self._log_formatter.format("issuing turn off request"))
-            try:
-                await self._async_send_ircode(code="standby")
-                await self._async_send_ircode(code="standby")
-            except Exception:
-                raise
-            else:
-                self._state = STATE_OFF
-                await self.async_update_ha_state()
+            await self._async_send_ircode(code="standby")
+            await self._async_send_ircode(code="standby")
+            self._state = STATE_OFF
+            await self.async_update_ha_state()
         else:
             _LOGGER.warning(
                 self._log_formatter.format("invalid state for turning off: %s"),
@@ -1236,22 +1220,18 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         _LOGGER.debug(self._log_formatter.format("entered"))
         self._flags[_FLAG_TURNING_ON] = True
         if self._state in (STATE_IDLE, STATE_OFF):
-            try:
-                await self._async_send_ircode(code="standby")
-            except Exception:
-                raise
-            else:
-                if not self._client.device.channel_number:
-                    _LOGGER.debug(
-                        self._log_formatter.format(
-                            "waiting for device to be ready for commands"
-                        )
+            await self._async_send_ircode(code="standby")
+            if not self._client.device.channel_number:
+                _LOGGER.debug(
+                    self._log_formatter.format(
+                        "waiting for device to be ready for commands"
                     )
-                while not self._client.device.channel_number:
-                    await self._async_fetch_player_state()
-                    await asyncio.sleep(0.2)
-                self._state = STATE_PLAYING
-                await self.async_update_ha_state()
+                )
+            while not self._client.device.channel_number:
+                await self._async_fetch_player_state()
+                await asyncio.sleep(0.2)
+            self._state = STATE_PLAYING
+            await self.async_update_ha_state()
         else:
             _LOGGER.warning(
                 self._log_formatter.format("invalid state for turning on: %s"),
