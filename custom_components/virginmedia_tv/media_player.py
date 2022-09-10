@@ -13,6 +13,7 @@ from homeassistant.components.media_player import (
     BrowseMedia,
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
+    MediaPlayerEntityFeature,
 )
 from homeassistant.components.media_player.const import (
     MEDIA_CLASS_DIRECTORY,
@@ -20,14 +21,6 @@ from homeassistant.components.media_player.const import (
     MEDIA_TYPE_CHANNEL,
     MEDIA_TYPE_CHANNELS,
     MEDIA_TYPE_TVSHOW,
-    SUPPORT_BROWSE_MEDIA,
-    SUPPORT_PAUSE,
-    SUPPORT_PLAY,
-    SUPPORT_PLAY_MEDIA,
-    SUPPORT_SELECT_SOURCE,
-    SUPPORT_STOP,
-    SUPPORT_TURN_OFF,
-    SUPPORT_TURN_ON,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_IDLE, STATE_OFF, STATE_PAUSED, STATE_PLAYING
@@ -176,6 +169,11 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialise."""
+        self._attr_device_class = MediaPlayerDeviceClass.RECEIVER
+        self._attr_name = f"{config_entry.title} TiVo"
+        self._attr_should_poll = False
+        self._attr_unique_id = f"{config_entry.unique_id}:media_player:{self.name}"
+
         self._channel_current: Dict[str, Any] = {
             "number": None,
         }
@@ -1244,11 +1242,6 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
 
     # region #-- standard properties --#
     @property
-    def device_class(self) -> Optional[str]:
-        """Device class of the entity."""
-        return MediaPlayerDeviceClass.TV
-
-    @property
     def device_info(self) -> DeviceInfo:
         """Set the device information."""
         ret = DeviceInfo(
@@ -1422,16 +1415,6 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         return str(ret)
 
     @property
-    def name(self) -> str:
-        """Return the name of the entity."""
-        return f"{self._config.title} TiVo"
-
-    @property
-    def should_poll(self) -> bool:
-        """Return whether this is a polling entity."""
-        return False
-
-    @property
     def source(self) -> Optional[str]:
         """Return the current source."""
         return self.media_title
@@ -1454,11 +1437,11 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
     def supported_features(self) -> int:
         """Return the supported features."""
         ret = (
-            SUPPORT_PAUSE
-            | SUPPORT_PLAY
-            | SUPPORT_STOP
-            | SUPPORT_TURN_OFF
-            | SUPPORT_TURN_ON
+            MediaPlayerEntityFeature.PAUSE
+            | MediaPlayerEntityFeature.PLAY
+            | MediaPlayerEntityFeature.STOP
+            | MediaPlayerEntityFeature.TURN_OFF
+            | MediaPlayerEntityFeature.TURN_ON
         )
 
         if self._config.options.get(
@@ -1467,15 +1450,14 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             if self._config.options.get(
                 CONF_CHANNEL_USE_MEDIA_BROWSER, DEF_CHANNEL_USE_MEDIA_BROWSER
             ):
-                ret = ret | SUPPORT_BROWSE_MEDIA | SUPPORT_PLAY_MEDIA
+                ret = (
+                    ret
+                    | MediaPlayerEntityFeature.BROWSE_MEDIA
+                    | MediaPlayerEntityFeature.PLAY_MEDIA
+                )
             else:
-                ret = ret | SUPPORT_SELECT_SOURCE
+                ret = ret | MediaPlayerEntityFeature.SELECT_SOURCE
 
         return ret
-
-    @property
-    def unique_id(self) -> str:
-        """Return the unique ID for player."""
-        return f"{self._config.unique_id}:media_player:{self.name}"
 
     # endregion
