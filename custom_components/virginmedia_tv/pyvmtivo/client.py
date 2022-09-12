@@ -39,16 +39,6 @@ class Device:
         self._channel_number: Optional[int] = None
         self._prev_channel_number: Optional[int] = None
 
-    def _set_channel_number(self, value: Optional[int] = None) -> None:
-        """Set the channel number.
-
-        :param value: the current channel number
-        :return: None
-        """
-        if value != self._channel_number:
-            self._prev_channel_number = self._channel_number
-            self._channel_number = value
-
     @property
     def host(self) -> str:
         """Return the device hostname."""
@@ -63,6 +53,13 @@ class Device:
     def channel_number(self) -> Optional[int]:
         """Return the current channel number."""
         return self._channel_number
+
+    @channel_number.setter
+    def channel_number(self, value: Optional[int]) -> None:
+        """Set the channel number."""
+        if value != self._channel_number:
+            self._prev_channel_number = self._channel_number
+            self._channel_number = value
 
     @property
     def previous_channel_number(self) -> Optional[int]:
@@ -299,7 +296,7 @@ class Client:
                 )
             except Exception as err:
                 if isinstance(err, asyncio.TimeoutError):
-                    self._tivo._set_channel_number(None)
+                    self._tivo.channel_number = None
                     raise VirginMediaCommandTimeout from err
 
                 _LOGGER.warning(
@@ -312,7 +309,7 @@ class Client:
                 _LOGGER.debug(self._log_formatter.format("raw data: %s"), data)
 
                 if not data:
-                    self._tivo._set_channel_number()
+                    self._tivo.channel_number = None
                     raise VirginMediaConnectionReset from None
 
                 data = data.decode().strip()
@@ -320,7 +317,7 @@ class Client:
                     regex = r"\d{4}"
                     regex_match: re.Match = re.search(regex, data)
                     if regex_match:
-                        self._tivo._set_channel_number(int(regex_match.group(0)))
+                        self._tivo.channel_number = int(regex_match.group(0))
                 elif data.startswith("CH_FAILED"):
                     raise VirginMediaError(data.split(" ")[-1])
                 elif data == "INVALID_KEY":
