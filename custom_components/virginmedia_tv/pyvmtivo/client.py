@@ -231,7 +231,7 @@ class Client:
             await self._send(f"keyboard {code}", wait_for_reply=wait_for_reply)
         except VirginMediaError as err:
             _LOGGER.warning(
-                self._log_formatter.format("type: %s, message: %s", type(err)), err
+                self._log_formatter.format("type: %s, message: %s"), type(err), err
             )
             if str(err).lower() == "invalid_key":
                 raise VirginMediaInvalidKey(key_code=code) from err
