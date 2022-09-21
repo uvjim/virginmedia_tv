@@ -121,10 +121,11 @@ class Client:
             )
             if isinstance(err, asyncio.TimeoutError):
                 raise VirginMediaCommandTimeout from err
-            elif isinstance(err, VirginMediaError):
-                raise
-            else:
-                raise VirginMediaError(format_error_message(err)) from err
+
+            if isinstance(err, VirginMediaError):
+                raise err from None
+
+            raise VirginMediaError(format_error_message(err)) from err
 
     # endregion
 
@@ -206,9 +207,9 @@ class Client:
         except VirginMediaError as err:
             if str(err).lower() == "invalid_key":
                 raise VirginMediaInvalidKey(key_code=code) from err
-            else:
-                raise
-        except Exception as err:
+
+            raise err from None
+        except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error(self._log_formatter.format("%s"), err)
         else:
             _LOGGER.debug(self._log_formatter.format("ircode sent: %s"), code)
