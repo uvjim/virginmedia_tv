@@ -524,12 +524,8 @@ class TVChannelLists:
         """Retrieve the data from the onine service."""
         _LOGGER.debug(self._log_formatter.format("entered"))
         async with self._session as session:
-            try:
-                resp: aiohttp.ClientResponse = await session.get(url=self._CHANNEL_URL)
-            except aiohttp.ClientError:
-                raise
-            else:
-                self._source = await resp.text(encoding="utf-8")
+            resp: aiohttp.ClientResponse = await session.get(url=self._CHANNEL_URL)
+            self._source = await resp.text(encoding="utf-8")
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
@@ -540,21 +536,17 @@ class TVChannelLists:
         """Return the data for the key table."""
         ret = {}
 
-        try:
-            soup: BeautifulSoup = BeautifulSoup(self._source, "html.parser")
-        except Exception:
-            raise
-        else:
-            key_header: bs4.element.Tag = soup.find(id="Key")
-            if key_header:
-                key_table: bs4.element.Tag = key_header.find_next("table")
-                key_row: bs4.element.Tag
-                for key_row in key_table.find_all("tr"):
-                    key_data: bs4.element.Tag = key_row.find("td")
-                    if key_data and key_data.text.lower().strip() in self._CHANNEL_KEYS:
-                        ret[key_data.text.lower().strip()] = key_data.attrs.get(
-                            "bgcolor", ""
-                        ).lower()
+        soup: BeautifulSoup = BeautifulSoup(self._source, "html.parser")
+        key_header: bs4.element.Tag = soup.find(id="Key")
+        if key_header:
+            key_table: bs4.element.Tag = key_header.find_next("table")
+            key_row: bs4.element.Tag
+            for key_row in key_table.find_all("tr"):
+                key_data: bs4.element.Tag = key_row.find("td")
+                if key_data and key_data.text.lower().strip() in self._CHANNEL_KEYS:
+                    ret[key_data.text.lower().strip()] = key_data.attrs.get(
+                        "bgcolor", ""
+                    ).lower()
 
         return ret
 
@@ -563,23 +555,19 @@ class TVChannelLists:
         """Process the data for the channels."""
         ret = {}
 
-        try:
-            soup: BeautifulSoup = BeautifulSoup(self._source, "html.parser")
-        except Exception:
-            raise
-        else:
-            channel_start: bs4.element.Tag = soup.find(id="Channel_List")
-            if channel_start:
-                ret["updated"]: int = int(datetime.now().timestamp()) * 1000
-                ret["channels"]: list = []
+        soup: BeautifulSoup = BeautifulSoup(self._source, "html.parser")
+        channel_start: bs4.element.Tag = soup.find(id="Channel_List")
+        if channel_start:
+            ret["updated"]: int = int(datetime.now().timestamp()) * 1000
+            ret["channels"]: list = []
 
-                channel_tables: bs4.element.ResultSet
-                channel_tables = channel_start.find_all_next("table", "wikitable")
-                table: bs4.element.Tag
-                for table in channel_tables:
-                    table_as_list: list = self._table_to_list(table=table)
-                    if table_as_list:
-                        ret["channels"].extend(table_as_list)
+            channel_tables: bs4.element.ResultSet
+            channel_tables = channel_start.find_all_next("table", "wikitable")
+            table: bs4.element.Tag
+            for table in channel_tables:
+                table_as_list: list = self._table_to_list(table=table)
+                if table_as_list:
+                    ret["channels"].extend(table_as_list)
 
         return ret
 
