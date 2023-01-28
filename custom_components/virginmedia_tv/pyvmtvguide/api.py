@@ -476,18 +476,24 @@ class TVChannelLists:
                     cell_counter: int = 0
                     for cell_idx, row_span in enumerate(row_spans):
                         if row_span == 1:
-                            cell: bs4.element.Tag = row_cells[cell_counter]
-                            if self._is_col_platform(col_name=headings[cell_idx]):
-                                channel_res = self._get_channel_resolution(channel=cell)
-                                if channel_res:
-                                    row[headings[cell_idx]] = {
-                                        channel_res: int(cell.text.strip() or 0)
-                                    }
+                            try:
+                                cell: bs4.element.Tag = row_cells[cell_counter]
+                            except IndexError:
+                                pass
                             else:
-                                row[headings[cell_idx]] = cell.text.strip()
-                            if cell.attrs.get("rowspan"):
-                                row_spans[cell_idx] = int(cell.attrs.get("rowspan"))
-                            cell_counter += 1
+                                if self._is_col_platform(col_name=headings[cell_idx]):
+                                    channel_res = self._get_channel_resolution(
+                                        channel=cell
+                                    )
+                                    if channel_res:
+                                        row[headings[cell_idx]] = {
+                                            channel_res: int(cell.text.strip() or 0)
+                                        }
+                                else:
+                                    row[headings[cell_idx]] = cell.text.strip()
+                                if cell.attrs.get("rowspan"):
+                                    row_spans[cell_idx] = int(cell.attrs.get("rowspan"))
+                                cell_counter += 1
                         else:
                             row[headings[cell_idx]] = ret[-1].get(headings[cell_idx])
                             row_spans[cell_idx] -= 1
