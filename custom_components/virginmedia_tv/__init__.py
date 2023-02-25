@@ -41,7 +41,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         log_formatter.format("Setting up entities for: %s"),
         config_entry.unique_id,
     )
-    hass.config_entries.async_setup_platforms(config_entry, PLATFORMS)
+    setup_platforms: list[str] = list(filter(None, PLATFORMS))
+    await hass.config_entries.async_forward_entry_setups(config_entry, setup_platforms)
 
     # region #-- Service Definition --#
     _LOGGER.debug(log_formatter.format("registering services"))
