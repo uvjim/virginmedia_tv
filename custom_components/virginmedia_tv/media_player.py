@@ -398,9 +398,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             if "media_position" in self._intervals:
                 self._ils_cancel(name="media_position", cancel_type="interval")
 
-        asyncio.run_coroutine_threadsafe(
-            coro=self.async_update_ha_state(), loop=self._hass.loop
-        )
+        self.async_schedule_update_ha_state()
 
     def _current_program_set(self, _: Optional[dt_util.dt.datetime] = None) -> None:
         """Set the current program from the cached listings."""
@@ -448,9 +446,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         )
 
         self._current_program_get_position()
-        asyncio.run_coroutine_threadsafe(
-            coro=self.async_update_ha_state(), loop=self.hass.loop
-        )
+        self.async_schedule_update_ha_state()
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     def _ils_cancel(self, name: str, cancel_type: str) -> None:
@@ -760,10 +756,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                                     self._log_formatter.format("setting state to off")
                                 )
                                 self._state = STATE_OFF
-                                asyncio.run_coroutine_threadsafe(
-                                    coro=self.async_update_ha_state(),
-                                    loop=self.hass.loop,
-                                )
+                                self.async_schedule_update_ha_state()
                             if "idle_to_off" in self._listeners:
                                 self._ils_cancel(
                                     cancel_type="listener", name="idle_to_off"
@@ -795,7 +788,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             self._channel_current["number"] = None
             # endregion
 
-        await self.async_update_ha_state()
+        self.async_schedule_update_ha_state()
 
     async def _async_send_ircode(
         self, code: str, from_service: bool = False, **_
@@ -916,7 +909,6 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         if self._config.options.get(
             CONF_CHANNEL_FETCH_ENABLE, DEF_CHANNEL_FETCH_ENABLE
         ):
-
             # region #-- setup the channels cache --#
             async def _async_cache_channels_start(
                 _: Optional[dt_util.dt.datetime] = None,
@@ -1121,7 +1113,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             self._state = STATE_PAUSED
         elif self._state == STATE_PAUSED:
             self._state = STATE_PLAYING
-        await self.async_update_ha_state()
+        self.async_schedule_update_ha_state()
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_media_play(self) -> None:
@@ -1130,7 +1122,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         await self._async_send_keycode(code="play")
         if self._state not in (STATE_OFF, STATE_IDLE):
             self._state = STATE_PLAYING
-        await self.async_update_ha_state()
+        self.async_schedule_update_ha_state()
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_media_stop(self) -> None:
@@ -1139,7 +1131,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
         await self._async_send_keycode(code="stop")
         if self._state == STATE_PAUSED:
             self._state = STATE_PLAYING
-        await self.async_update_ha_state()
+        self.async_schedule_update_ha_state()
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     async def async_play_media(self, media_type, media_id, **kwargs) -> None:
@@ -1204,7 +1196,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
             await self._async_send_ircode(code="standby")
             await self._async_send_ircode(code="standby")
             self._state = STATE_OFF
-            await self.async_update_ha_state()
+            self.async_schedule_update_ha_state()
         else:
             _LOGGER.warning(
                 self._log_formatter.format("invalid state for turning off: %s"),
@@ -1229,7 +1221,7 @@ class VirginMediaPlayer(MediaPlayerEntity, ABC):
                 await self._async_fetch_player_state()
                 await asyncio.sleep(0.2)
             self._state = STATE_PLAYING
-            await self.async_update_ha_state()
+            self.async_schedule_update_ha_state()
         else:
             _LOGGER.warning(
                 self._log_formatter.format("invalid state for turning on: %s"),
