@@ -1,7 +1,6 @@
 """Sensor entities."""
 
 # region #-- imports --#
-import asyncio
 import logging
 
 from homeassistant.components.sensor import DOMAIN as ENTITY_DOMAIN
@@ -60,9 +59,7 @@ class TiVoSoftwareSensor(SensorEntity):
         )
         if self.enabled:
             self._state = swversion
-            asyncio.run_coroutine_threadsafe(
-                coro=self.async_update_ha_state(), loop=self._hass.loop
-            )
+            self.async_schedule_update_ha_state()
         _LOGGER.debug(self._log_formatter.format("exited"))
 
     # endregion
